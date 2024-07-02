@@ -6,7 +6,7 @@ import Maps from "./Maps/Index";
 
 function App() {
   const [open, setOpen] = useState(false);
-  const [maps, setMaps] = useState([1]);
+  const [maps, setMaps] = useState([]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
