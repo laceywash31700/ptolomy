@@ -24,7 +24,12 @@ function Maps({ open, handleClose, maps }) {
             <DragAndDrop />
           </>
         ) : (
-          <div>There are maps that are available</div>
+          <>
+            <div>
+              There are maps that are available do you want to add a new map
+            </div>
+            <DragAndDrop />
+          </>
         )}
       </Box>
     </Modal>
