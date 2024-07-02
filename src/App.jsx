@@ -6,6 +6,7 @@ import Maps from "./Maps/Index";
 
 function App() {
   const [open, setOpen] = useState(false);
+  const [maps, setMaps] = useState([]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -24,7 +25,7 @@ function App() {
       >
         <AddIcon />
       </Fab>
-      <Maps open={open} handleClose={handleClose} />
+      <Maps open={open} handleClose={handleClose} maps={maps} />
     </>
   );
 }
