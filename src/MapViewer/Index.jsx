@@ -37,6 +37,19 @@ function MapViewer({ type, src }) {
     <>
       {" "}
       <TransformWrapper>
+        {/* Typography and Canvas components */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: "16px",
+            left: "16px",
+            zIndex: 10,
+          }}
+        >
+          <Typography variant="h5" component="div" gutterBottom>
+            Map Viewer
+          </Typography>
+        </Box>{" "}
         <Paper
           elevation={3}
           style={{
@@ -56,29 +69,16 @@ function MapViewer({ type, src }) {
             filter: "blur(20px) brightness(80%)",
           }}
         />
-        {/* Typography and Canvas components */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: "16px",
-            left: "16px",
-            zIndex: 10,
-          }}
-        >
-          <Typography variant="h5" component="div" gutterBottom>
-            Map Viewer
-          </Typography>
-        </Box>
         <TransformComponent>
           {type === "image" && (
-              <canvas
-                ref={canvasRef}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              />
+            <canvas
+              ref={canvasRef}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+              }}
+            />
           )}
           {type !== "image" && (
             <ReactPlayer
