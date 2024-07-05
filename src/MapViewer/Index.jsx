@@ -1,8 +1,7 @@
-import axios from "axios";
+import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { useEffect, useRef, useState } from "react";
-import { Box, Typography, Paper } from "@mui/material";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { Box, Typography } from "@mui/material";
+import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
   const canvasRef = useRef(null);
@@ -16,7 +15,7 @@ function MapViewer({ type, src }) {
       img.src = src;
       img.onload = () => {
         const maxWidth = window.innerWidth * 0.9; // Adjust as needed
-        const maxHeight = window.innerHeight * 0.8; // Adjust as needed
+        const maxHeight = window.innerHeight * 0.9; // Adjust as needed
         const scaleFactor = Math.min(
           maxWidth / img.width,
           maxHeight / img.height
@@ -34,48 +33,73 @@ function MapViewer({ type, src }) {
   }, [type, src]);
 
   return (
-    <>
-      {" "}
-      <TransformWrapper>
-        {/* Typography and Canvas components */}
-        <Box
+    <Box
+      sx={{
+        position: "absolute",
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
+      }}
+    >
+      <Typography
+        variant="h5"
+        component="div"
+        gutterBottom
+        sx={{
+          position: "inherit",
+          top: "16px",
+          left: "16px",
+          zIndex: 20,
+          color: "white",
+        }}
+      >
+        Map Viewer
+      </Typography>
+
+      <Box
+        sx={{
+          position: "relative",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), ${
+            type === "image" ? `url(${src})` : "none"
+          }`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(10px) brightness(100%)",
+          zIndex: 1,
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 2,
+        }}
+      >
+        <MapInteractionCSS
           sx={{
-            position: "absolute",
-            top: "16px",
-            left: "16px",
-            zIndex: 10,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
-          <Typography variant="h5" component="div" gutterBottom>
-            Map Viewer
-          </Typography>
-        </Box>{" "}
-        <Paper
-          elevation={3}
-          style={{
-            width: "80vw", // Adjust as needed
-            height: "80vh", // Adjust as needed
-            padding: "16px",
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            overflow: "hidden",
-            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), ${
-              type === "image" ? `url(${src})` : "none"
-            }`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(20px) brightness(80%)",
-          }}
-        />
-        <TransformComponent>
           {type === "image" && (
             <canvas
               ref={canvasRef}
               style={{
-                width: "100%",
-                height: "100%",
+                width: `${dimensions.width}px`,
+                height: `${dimensions.height}px`,
                 objectFit: "contain",
               }}
             />
@@ -86,12 +110,12 @@ function MapViewer({ type, src }) {
               controls={true}
               width="100%"
               height="100%"
-              style={{ position: "absolute", top: "0", left: "0" }}
+              style={{ position: "relative" }}
             />
-          )}{" "}
-        </TransformComponent>
-      </TransformWrapper>
-    </>
+          )}
+        </MapInteractionCSS>
+      </Box>
+    </Box>
   );
 }
 
