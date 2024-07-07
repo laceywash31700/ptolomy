@@ -5,7 +5,12 @@ import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
   const canvasRef = useRef(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0,
+  });
 
   useEffect(() => {
     if (type === "image" && canvasRef.current) {
@@ -14,19 +19,31 @@ function MapViewer({ type, src }) {
       const img = new Image();
       img.src = src;
       img.onload = () => {
-        const maxWidth = window.innerWidth * 0.9; // Adjust as needed
-        const maxHeight = window.innerHeight * 0.9; // Adjust as needed
+        const maxWidth = window.innerWidth * 0.8; 
+        const maxHeight = window.innerHeight * 0.8; 
+        const initialScalingMultiplier = 1.2; 
         const scaleFactor = Math.min(
           maxWidth / img.width,
           maxHeight / img.height
-        );
+        ) * initialScalingMultiplier;
 
         const scaledWidth = img.width * scaleFactor;
         const scaledHeight = img.height * scaleFactor;
 
-        setDimensions({ width: scaledWidth, height: scaledHeight });
+        const centerX = (window.innerWidth - scaledWidth) / 2;
+        const centerY = (window.innerHeight - scaledHeight) / 2;
+
+        setDimensions({
+          width: scaledWidth,
+          height: scaledHeight,
+          x: centerX,
+          y: centerY,
+        });
+
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
       };
     }
@@ -86,6 +103,15 @@ function MapViewer({ type, src }) {
         }}
       >
         <MapInteractionCSS
+          scaleMin={0.5}
+          scaleMax={30} 
+          defaultValue={{
+            scale: 1,
+            translation: {
+              x: window.innerWidth / 2.6,
+              y: window.innerHeight / 25,
+            },
+          }}
           sx={{
             width: "100%",
             height: "100%",

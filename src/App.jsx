@@ -9,7 +9,7 @@ function App() {
   const [open, setOpen] = useState(false);
   const [maps, setMaps] = useState([]);
   const [mapType, setMapType] = useState("image");
-  const [mapSrc, setMapSrc] = useState("/yggdrasilVillageAutumn.jpg");
+  const [mapSrc, setMapSrc] = useState("/SecretGrotto.jpg");
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
