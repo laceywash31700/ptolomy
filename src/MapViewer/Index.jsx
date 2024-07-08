@@ -4,7 +4,9 @@ import { Box, Typography, FormControlLabel, Checkbox, Slider, Button, ToggleButt
 import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null); // Canvas for the image
+  const fogCanvasRef = useRef(null); // Canvas for the fog layer
+  const gridCanvasRef = useRef(null); // Canvas for the grid layer
   const [dimensions, setDimensions] = useState({
     width: 0,
     height: 0,
@@ -20,9 +22,13 @@ function MapViewer({ type, src }) {
   const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
 
   useEffect(() => {
-    if (type === "image" && canvasRef.current) {
+    if (type === "image" && canvasRef.current && fogCanvasRef.current && gridCanvasRef.current) {
       const canvas = canvasRef.current;
+      const fogCanvas = fogCanvasRef.current;
+      const gridCanvas = gridCanvasRef.current;
       const ctx = canvas.getContext("2d");
+      const fogCtx = fogCanvas.getContext("2d");
+      const gridCtx = gridCanvas.getContext("2d");
       const img = new Image();
       img.src = src;
       img.onload = () => {
@@ -48,43 +54,60 @@ function MapViewer({ type, src }) {
 
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
+        fogCanvas.width = scaledWidth;
+        fogCanvas.height = scaledHeight;
+        gridCanvas.width = scaledWidth;
+        gridCanvas.height = scaledHeight;
 
-        redrawCanvas(ctx, img, scaledWidth, scaledHeight);
+        ctx.clearRect(0, 0, scaledWidth, scaledHeight);
+        ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
+        if (showGrid) {
+          drawGrid(gridCtx, scaledWidth, scaledHeight, gridSpacing);
+        }
+
+        if (showFogOfWar) {
+          fogCtx.globalCompositeOperation = 'source-over';
+          fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          fogCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
+        }
       };
     }
   }, [type, src, showGrid, showFogOfWar, gridSpacing]);
 
-  const redrawCanvas = (ctx, img, scaledWidth, scaledHeight) => {
-    ctx.clearRect(0, 0, scaledWidth, scaledHeight);
-    ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+  const drawGrid = (ctx, width, height, spacing) => {
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 1;
 
-    if (showGrid) {
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-      ctx.lineWidth = 1;
-
-      for (let x = gridSpacing; x < scaledWidth; x += gridSpacing) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, scaledHeight);
-      }
-
-      for (let y = gridSpacing; y < scaledHeight; y += gridSpacing) {
-        ctx.moveTo(0, y);
-        ctx.lineTo(scaledWidth, y);
-      }
-
-      ctx.stroke();
+    for (let x = spacing; x < width; x += spacing) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
     }
 
-    if (showFogOfWar) {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+    for (let y = spacing; y < height; y += spacing) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
     }
+
+    ctx.stroke();
   };
 
   const handleGridToggle = () => {
-    setShowGrid(!showGrid);
+    setShowGrid((prev) => {
+      const newShowGrid = !prev;
+      if (gridCanvasRef.current) {
+        const gridCanvas = gridCanvasRef.current;
+        const gridCtx = gridCanvas.getContext("2d");
+        if (newShowGrid) {
+          drawGrid(gridCtx, dimensions.width, dimensions.height, gridSpacing);
+        } else {
+          gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+        }
+      }
+      return newShowGrid;
+    });
   };
 
   const handleFogOfWarToggle = () => {
@@ -92,13 +115,11 @@ function MapViewer({ type, src }) {
     if (!showFogOfWar) {
       setMode("view");
     } else {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        redrawCanvas(ctx, img, dimensions.width, dimensions.height);
-      };
+      const fogCanvas = fogCanvasRef.current;
+      const fogCtx = fogCanvas.getContext("2d");
+      fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+      fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      fogCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
     }
   };
 
@@ -108,6 +129,11 @@ function MapViewer({ type, src }) {
 
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
+    if (gridCanvasRef.current) {
+      const gridCanvas = gridCanvasRef.current;
+      const gridCtx = gridCanvas.getContext("2d");
+      drawGrid(gridCtx, dimensions.width, dimensions.height, newValue);
+    }
   };
 
   const handleMouseDown = () => {
@@ -122,23 +148,21 @@ function MapViewer({ type, src }) {
 
   const handleMouseMove = (event) => {
     if (spraying) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      const rect = canvas.getBoundingClientRect();
+      const fogCanvas = fogCanvasRef.current;
+      const fogCtx = fogCanvas.getContext("2d");
+      const rect = fogCanvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       const radius = 20; // Radius of the fog sprayer
 
-      if (fogMode === 'erase') {
-        ctx.globalCompositeOperation = 'destination-out'; // Erase mode: make areas transparent
-      } else {
-        ctx.globalCompositeOperation = 'source-over'; // Spray mode: add fog
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Fog color for spraying
+      fogCtx.globalCompositeOperation = fogMode === 'erase' ? 'destination-out' : 'source-over'; // Erase mode: make areas transparent
+      if (fogMode === 'spray') {
+        fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Fog color for spraying
       }
 
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2, false);
-      ctx.fill();
+      fogCtx.beginPath();
+      fogCtx.arc(x, y, radius, 0, Math.PI * 2, false);
+      fogCtx.fill();
     }
   };
 
@@ -291,17 +315,54 @@ function MapViewer({ type, src }) {
             alignItems: "center",
           }}
         >
-          <canvas
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
-            style={{
-              width: `${dimensions.width}px`,
-              height: `${dimensions.height}px`,
-              objectFit: "contain",
-            }}
-          />
+          <div style={{ position: "relative" }}>
+            {type === "image" && (
+              <>
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    width: `${dimensions.width}px`,
+                    height: `${dimensions.height}px`,
+                    objectFit: "contain",
+                  }}
+                />
+                <canvas
+                  ref={gridCanvasRef}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: `${dimensions.width}px`,
+                    height: `${dimensions.height}px`,
+                  }}
+                />
+                {showFogOfWar && (
+                  <canvas
+                    ref={fogCanvasRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onMouseMove={handleMouseMove}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: `${dimensions.width}px`,
+                      height: `${dimensions.height}px`,
+                    }}
+                  />
+                )}
+              </>
+            )}
+            {type !== "image" && (
+              <ReactPlayer
+                url={src}
+                controls={true}
+                width="100%"
+                height="100%"
+                style={{ position: "relative" }}
+              />
+            )}
+          </div>
         </MapInteractionCSS>
       </Box>
     </Box>
