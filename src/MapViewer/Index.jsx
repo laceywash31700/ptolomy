@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { Box, Typography, FormControlLabel, Checkbox, Slider, Button } from "@mui/material";
+import { Box, Typography, FormControlLabel, Checkbox, Slider, Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
@@ -15,6 +15,9 @@ function MapViewer({ type, src }) {
   const [showGrid, setShowGrid] = useState(false);
   const [showFogOfWar, setShowFogOfWar] = useState(false);
   const [showGridSettings, setShowGridSettings] = useState(false);
+  const [spraying, setSpraying] = useState(false); // State to track if the user is currently spraying
+  const [mode, setMode] = useState("view"); // State to track the current mode (view or edit)
+  const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
 
   useEffect(() => {
     if (type === "image" && canvasRef.current) {
@@ -45,35 +48,40 @@ function MapViewer({ type, src }) {
 
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-
-        if (showGrid) {
-          ctx.beginPath();
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-          ctx.lineWidth = 1;
-
-          for (let x = gridSpacing; x < scaledWidth; x += gridSpacing) {
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, scaledHeight);
-          }
-
-          for (let y = gridSpacing; y < scaledHeight; y += gridSpacing) {
-            ctx.moveTo(0, y);
-            ctx.lineTo(scaledWidth, y);
-          }
-
-          ctx.stroke();
-        }
-
-        if (showFogOfWar) {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+        redrawCanvas(ctx, img, scaledWidth, scaledHeight);
       };
     }
   }, [type, src, showGrid, showFogOfWar, gridSpacing]);
+
+  const redrawCanvas = (ctx, img, scaledWidth, scaledHeight) => {
+    ctx.clearRect(0, 0, scaledWidth, scaledHeight);
+    ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
+    if (showGrid) {
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.lineWidth = 1;
+
+      for (let x = gridSpacing; x < scaledWidth; x += gridSpacing) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, scaledHeight);
+      }
+
+      for (let y = gridSpacing; y < scaledHeight; y += gridSpacing) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(scaledWidth, y);
+      }
+
+      ctx.stroke();
+    }
+
+    if (showFogOfWar) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+    }
+  };
 
   const handleGridToggle = () => {
     setShowGrid(!showGrid);
@@ -81,6 +89,17 @@ function MapViewer({ type, src }) {
 
   const handleFogOfWarToggle = () => {
     setShowFogOfWar(!showFogOfWar);
+    if (!showFogOfWar) {
+      setMode("view");
+    } else {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        redrawCanvas(ctx, img, dimensions.width, dimensions.height);
+      };
+    }
   };
 
   const handleGridSettingsToggle = () => {
@@ -89,6 +108,46 @@ function MapViewer({ type, src }) {
 
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
+  };
+
+  const handleMouseDown = () => {
+    if (mode === "edit" && showFogOfWar) {
+      setSpraying(true); // Start spraying
+    }
+  };
+
+  const handleMouseUp = () => {
+    setSpraying(false); // Stop spraying
+  };
+
+  const handleMouseMove = (event) => {
+    if (spraying) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const radius = 20; // Radius of the fog sprayer
+
+      if (fogMode === 'erase') {
+        ctx.globalCompositeOperation = 'destination-out'; // Erase mode: make areas transparent
+      } else {
+        ctx.globalCompositeOperation = 'source-over'; // Spray mode: add fog
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Fog color for spraying
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2, false);
+      ctx.fill();
+    }
+  };
+
+  const handleModeChange = (event, newMode) => {
+    setMode(newMode);
+  };
+
+  const handleFogModeChange = (event, newFogMode) => {
+    setFogMode(newFogMode);
   };
 
   return (
@@ -157,6 +216,30 @@ function MapViewer({ type, src }) {
           label="Fog of War"
           sx={{ color: "white" }}
         />
+        {showFogOfWar && (
+          <>
+            <ToggleButtonGroup
+              value={mode}
+              exclusive
+              onChange={handleModeChange}
+              sx={{ marginTop: 2 }}
+            >
+              <ToggleButton value="view" sx={{ color: "white" }}>View</ToggleButton>
+              <ToggleButton value="edit" sx={{ color: "white" }}>Edit</ToggleButton>
+            </ToggleButtonGroup>
+            {mode === "edit" && (
+              <ToggleButtonGroup
+                value={fogMode}
+                exclusive
+                onChange={handleFogModeChange}
+                sx={{ marginTop: 2 }}
+              >
+                <ToggleButton value="spray" sx={{ color: "white" }}>Spray Fog</ToggleButton>
+                <ToggleButton value="erase" sx={{ color: "white" }}>Erase Fog</ToggleButton>
+              </ToggleButtonGroup>
+            )}
+          </>
+        )}
       </Box>
       <Box
         sx={{
@@ -197,6 +280,9 @@ function MapViewer({ type, src }) {
               y: window.innerHeight / 25,
             },
           }}
+          showControls={mode === "view"}
+          disableZoom={mode === "edit"}
+          disablePan={mode === "edit"}
           sx={{
             width: "100%",
             height: "100%",
@@ -205,25 +291,17 @@ function MapViewer({ type, src }) {
             alignItems: "center",
           }}
         >
-          {type === "image" && (
-            <canvas
-              ref={canvasRef}
-              style={{
-                width: `${dimensions.width}px`,
-                height: `${dimensions.height}px`,
-                objectFit: "contain",
-              }}
-            />
-          )}
-          {type !== "image" && (
-            <ReactPlayer
-              url={src}
-              controls={true}
-              width="100%"
-              height="100%"
-              style={{ position: "relative" }}
-            />
-          )}
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            style={{
+              width: `${dimensions.width}px`,
+              height: `${dimensions.height}px`,
+              objectFit: "contain",
+            }}
+          />
         </MapInteractionCSS>
       </Box>
     </Box>
