@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, FormControlLabel, Checkbox, Slider, Button } from "@mui/material";
 import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
@@ -11,6 +11,10 @@ function MapViewer({ type, src }) {
     x: 0,
     y: 0,
   });
+  const [gridSpacing, setGridSpacing] = useState(50);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showFogOfWar, setShowFogOfWar] = useState(false);
+  const [showGridSettings, setShowGridSettings] = useState(false);
 
   useEffect(() => {
     if (type === "image" && canvasRef.current) {
@@ -19,13 +23,12 @@ function MapViewer({ type, src }) {
       const img = new Image();
       img.src = src;
       img.onload = () => {
-        const maxWidth = window.innerWidth * 0.8; 
-        const maxHeight = window.innerHeight * 0.8; 
-        const initialScalingMultiplier = 1.2; 
-        const scaleFactor = Math.min(
-          maxWidth / img.width,
-          maxHeight / img.height
-        ) * initialScalingMultiplier;
+        const maxWidth = window.innerWidth * 0.8;
+        const maxHeight = window.innerHeight * 0.8;
+        const initialScalingMultiplier = 1.2;
+        const scaleFactor =
+          Math.min(maxWidth / img.width, maxHeight / img.height) *
+          initialScalingMultiplier;
 
         const scaledWidth = img.width * scaleFactor;
         const scaledHeight = img.height * scaleFactor;
@@ -43,11 +46,50 @@ function MapViewer({ type, src }) {
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
+        if (showGrid) {
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+          ctx.lineWidth = 1;
+
+          for (let x = gridSpacing; x < scaledWidth; x += gridSpacing) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, scaledHeight);
+          }
+
+          for (let y = gridSpacing; y < scaledHeight; y += gridSpacing) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(scaledWidth, y);
+          }
+
+          ctx.stroke();
+        }
+
+        if (showFogOfWar) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
       };
     }
-  }, [type, src]);
+  }, [type, src, showGrid, showFogOfWar, gridSpacing]);
+
+  const handleGridToggle = () => {
+    setShowGrid(!showGrid);
+  };
+
+  const handleFogOfWarToggle = () => {
+    setShowFogOfWar(!showFogOfWar);
+  };
+
+  const handleGridSettingsToggle = () => {
+    setShowGridSettings(!showGridSettings);
+  };
+
+  const handleGridSpacingChange = (event, newValue) => {
+    setGridSpacing(newValue);
+  };
 
   return (
     <Box
@@ -72,7 +114,50 @@ function MapViewer({ type, src }) {
       >
         Map Viewer
       </Typography>
-
+      <Box
+        sx={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          zIndex: 20,
+          color: "white",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <FormControlLabel
+          control={<Checkbox checked={showGrid} onChange={handleGridToggle} />}
+          label="Show Grid"
+          sx={{ color: "white" }}
+        />
+        {showGrid && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGridSettingsToggle}
+            sx={{ marginTop: 1 }}
+          >
+            Grid Settings
+          </Button>
+        )}
+        {showGridSettings && (
+          <Slider
+            value={gridSpacing}
+            min={10}
+            max={200}
+            onChange={handleGridSpacingChange}
+            sx={{ marginTop: 2, color: "white" }}
+            aria-labelledby="grid-spacing-slider"
+          />
+        )}
+        <FormControlLabel
+          control={
+            <Checkbox checked={showFogOfWar} onChange={handleFogOfWarToggle} />
+          }
+          label="Fog of War"
+          sx={{ color: "white" }}
+        />
+      </Box>
       <Box
         sx={{
           position: "relative",
@@ -104,7 +189,7 @@ function MapViewer({ type, src }) {
       >
         <MapInteractionCSS
           scaleMin={0.5}
-          scaleMax={30} 
+          scaleMax={30}
           defaultValue={{
             scale: 1,
             translation: {
