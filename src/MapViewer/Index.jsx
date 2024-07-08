@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { Box, Typography, FormControlLabel, Checkbox, Slider, Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import {
+  Box,
+  Typography,
+  FormControlLabel,
+  Checkbox,
+  Slider,
+  Button,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
 import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
@@ -22,7 +31,12 @@ function MapViewer({ type, src }) {
   const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
 
   useEffect(() => {
-    if (type === "image" && canvasRef.current && fogCanvasRef.current && gridCanvasRef.current) {
+    if (
+      type === "image" &&
+      canvasRef.current &&
+      fogCanvasRef.current &&
+      gridCanvasRef.current
+    ) {
       const canvas = canvasRef.current;
       const fogCanvas = fogCanvasRef.current;
       const gridCanvas = gridCanvasRef.current;
@@ -67,8 +81,8 @@ function MapViewer({ type, src }) {
         }
 
         if (showFogOfWar) {
-          fogCtx.globalCompositeOperation = 'source-over';
-          fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          fogCtx.globalCompositeOperation = "source-over";
+          fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
           fogCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
         }
       };
@@ -118,7 +132,7 @@ function MapViewer({ type, src }) {
       const fogCanvas = fogCanvasRef.current;
       const fogCtx = fogCanvas.getContext("2d");
       fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-      fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
       fogCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
     }
   };
@@ -155,9 +169,10 @@ function MapViewer({ type, src }) {
       const y = event.clientY - rect.top;
       const radius = 20; // Radius of the fog sprayer
 
-      fogCtx.globalCompositeOperation = fogMode === 'erase' ? 'destination-out' : 'source-over'; // Erase mode: make areas transparent
-      if (fogMode === 'spray') {
-        fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Fog color for spraying
+      fogCtx.globalCompositeOperation =
+        fogMode === "erase" ? "destination-out" : "source-over"; // Erase mode: make areas transparent
+      if (fogMode === "spray") {
+        fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Fog color for spraying
       }
 
       fogCtx.beginPath();
@@ -200,8 +215,8 @@ function MapViewer({ type, src }) {
       <Box
         sx={{
           position: "absolute",
-          top: "16px",
-          right: "16px",
+          top: "70px", // Adjusted to position below the Typography
+          left: "16px", // Adjusted to position on the left side
           zIndex: 20,
           color: "white",
           display: "flex",
@@ -248,8 +263,12 @@ function MapViewer({ type, src }) {
               onChange={handleModeChange}
               sx={{ marginTop: 2 }}
             >
-              <ToggleButton value="view" sx={{ color: "white" }}>View</ToggleButton>
-              <ToggleButton value="edit" sx={{ color: "white" }}>Edit</ToggleButton>
+              <ToggleButton value="view" sx={{ color: "white" }}>
+                View
+              </ToggleButton>
+              <ToggleButton value="edit" sx={{ color: "white" }}>
+                Edit
+              </ToggleButton>
             </ToggleButtonGroup>
             {mode === "edit" && (
               <ToggleButtonGroup
@@ -258,8 +277,12 @@ function MapViewer({ type, src }) {
                 onChange={handleFogModeChange}
                 sx={{ marginTop: 2 }}
               >
-                <ToggleButton value="spray" sx={{ color: "white" }}>Spray Fog</ToggleButton>
-                <ToggleButton value="erase" sx={{ color: "white" }}>Erase Fog</ToggleButton>
+                <ToggleButton value="spray" sx={{ color: "white" }}>
+                  Spray Fog
+                </ToggleButton>
+                <ToggleButton value="erase" sx={{ color: "white" }}>
+                  Erase Fog
+                </ToggleButton>
               </ToggleButtonGroup>
             )}
           </>
@@ -281,6 +304,7 @@ function MapViewer({ type, src }) {
           zIndex: 1,
         }}
       />
+
       <Box
         sx={{
           position: "absolute",
