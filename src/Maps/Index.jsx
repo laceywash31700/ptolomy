@@ -1,5 +1,6 @@
-import { Box, Modal, Typography } from "@mui/material";
-import DragAndDrop from "../Drag&Drop/Index";
+import { Box, Modal} from "@mui/material";
+import MapDragAndDrop from "../MapDrag&Drop/Index";
+import TokenDragAndDrop from "../TokenDrag&Drop/Index";
 
 const style = {
   position: "absolute",
@@ -18,17 +19,15 @@ function Maps({ open, handleClose, maps }) {
       <Box sx={style}>
         {maps.length === 0 ? (
           <>
-            <Typography variant="h6" component="h2" align="center">
-              There currently are no uploaded maps
-            </Typography>
-            <DragAndDrop />
+            <MapDragAndDrop/>
+            <br/>
+            <TokenDragAndDrop/>
           </>
         ) : (
           <>
-            <div>
-              There are maps that are available do you want to add a new map
-            </div>
-            <DragAndDrop />
+            <MapDragAndDrop />
+            <br/>
+            <TokenDragAndDrop/>
           </>
         )}
       </Box>

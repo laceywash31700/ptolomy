@@ -22,7 +22,7 @@ function DragAndDrop() {
     formData.append("file", file);
 
     try {
-      const response = await axios.post("/upload", formData, {
+      const response = await axios.post("/uploadMap", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -40,7 +40,7 @@ function DragAndDrop() {
   return (
     <div {...getRootProps()} style={{ ...baseStyle, ...(isDragActive ? activeStyle : {}) }}>
       <input {...getInputProps()} />
-      <p>Drag 'n' drop files here, or click to select files</p>
+      <p>Drag 'n' drop map files here, or click to select files</p>
     </div>
   );
 }
