@@ -1,6 +1,5 @@
-import "./App.css";
-import { useState } from "react";
-import { Fab, Container, Box } from "@mui/material";
+import React, { useState } from "react";
+import { Container, Box, Fab } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import Maps from "./Maps/Index";
 import MapViewer from "./MapViewer/Index";
@@ -14,9 +13,22 @@ function App() {
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
+  const backgroundStyle = {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100vw",
+    height: "100vh",
+    backgroundImage: `url(${mapSrc})`,
+    backgroundSize: '100%', 
+    backgroundPosition: 'center',
+    filter: "blur(30px)",
+    zIndex: -1
+  };
   return (
-    <Container>
+    <Container maxWidth="false" disableGutters>
       <Box sx={{ position: "relative", minHeight: "100vh" }}>
+        <div style={backgroundStyle}></div>
         <Fab
           color="primary"
           aria-label="add"
@@ -30,16 +42,7 @@ function App() {
           <AddIcon />
         </Fab>
         <Maps open={open} handleClose={handleClose} maps={maps} />
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "100vh",
-          }}
-        >
-          <MapViewer type={mapType} src={mapSrc} />
-        </Box>
+        <MapViewer type={mapType} src={mapSrc} />
       </Box>
     </Container>
   );
