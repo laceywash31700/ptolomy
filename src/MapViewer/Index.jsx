@@ -14,35 +14,37 @@ import {
 import { MapInteractionCSS } from "react-map-interaction";
 
 function MapViewer({ type, src }) {
-  const canvasRef = useRef(null);
-  const fogCanvasRef = useRef(null);
-  const gridCanvasRef = useRef(null);
+  const canvasRef = useRef(null); // Main canvas reference
+  const fogCanvasRef = useRef(null); // Fog of war canvas reference
+  const gridCanvasRef = useRef(null); // Grid canvas reference
   const [dimensions, setDimensions] = useState({
     width: 0,
     height: 0,
     x: 0,
     y: 0,
-  });
-  const [scale, setScale] = useState(1.1);
-  const [translation, setTranslation] = useState({ x: 0, y: 0 });
-  const [gridSpacing, setGridSpacing] = useState(50);
-  const [showGrid, setShowGrid] = useState(false);
-  const [showFogOfWar, setShowFogOfWar] = useState(false);
-  const [showGridSettings, setShowGridSettings] = useState(false);
-  const [spraying, setSpraying] = useState(false);
-  const [mode, setMode] = useState("view");
-  const [fogMode, setFogMode] = useState("spray");
-  const [unitDistance, setUnitDistance] = useState(5);
-  const [rulerActive, setRulerActive] = useState(false);
-  const [rulerStart, setRulerStart] = useState(null);
-  const [rulerEnd, setRulerEnd] = useState(null);
+  }); // State for storing canvas dimensions
+  const [scale, setScale] = useState(1.1); // State for scaling the canvas
+  const [translation, setTranslation] = useState({ x: 0, y: 0 }); // State for canvas translation
+  const [gridSpacing, setGridSpacing] = useState(50); // State for grid spacing
+  const [showGrid, setShowGrid] = useState(false); // State to show/hide grid
+  const [showFogOfWar, setShowFogOfWar] = useState(false); // State to show/hide fog of war
+  const [showGridSettings, setShowGridSettings] = useState(false); // State to show/hide grid settings slider
+  const [spraying, setSpraying] = useState(false); // State to track if fog of war is being sprayed
+  const [mode, setMode] = useState("view"); // State to track mode (view or edit)
+  const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
+  const [unitDistance, setUnitDistance] = useState(5); // State to set the unit distance for ruler
+  const [rulerActive, setRulerActive] = useState(false); // State to track if ruler is active
+  const [rulerStart, setRulerStart] = useState(null); // State to store start point of ruler
+  const [rulerEnd, setRulerEnd] = useState(null); // State to store end point of ruler
 
+  // Toggles the ruler tool
   const handleRulerToggle = () => {
     setRulerActive(!rulerActive);
     setRulerStart(null);
     setRulerEnd(null);
   };
 
+  // Handles mouse down event for fog of war and ruler tool
   const handleMouseDown = (event) => {
     if (mode === "edit" && showFogOfWar) {
       setSpraying(true);
@@ -56,6 +58,7 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Handles mouse move event for fog of war and ruler tool
   const handleMouseMove = (event) => {
     if (spraying && showFogOfWar) {
       const fogCanvas = fogCanvasRef.current;
@@ -80,6 +83,7 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Handles mouse up event to stop spraying and clear the ruler line
   const handleMouseUp = () => {
     setSpraying(false);
     if (rulerActive && rulerStart) {
@@ -92,6 +96,7 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Draws the temporary ruler line and calculates the distance
   const drawTemporaryLine = () => {
     if (rulerStart && rulerEnd && fogCanvasRef.current) {
       const ctx = fogCanvasRef.current.getContext("2d");
@@ -117,6 +122,7 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Effect to update cursor style based on fog mode and edit mode
   useEffect(() => {
     if (fogCanvasRef.current) {
       if (mode === "edit" && showFogOfWar) {
@@ -139,6 +145,7 @@ function MapViewer({ type, src }) {
     }
   }, [mode, fogMode, showFogOfWar]);
 
+  // Effect to load the image and initialize canvas dimensions and grid
   useEffect(() => {
     if (
       type === "image" &&
@@ -171,8 +178,8 @@ function MapViewer({ type, src }) {
           y: (window.innerHeight - scaledHeight) / 2,
         });
         setTranslation({
-          x: (window.innerWidth - scaledWidth * scaleFactor) / 2.5,
-          y: (window.innerHeight - scaledHeight * scaleFactor) / 40,
+          x: (window.innerWidth - scaledWidth) / 2,
+          y: (window.innerHeight - scaledHeight) / 2,
         });
 
         canvas.width = scaledWidth;
@@ -190,6 +197,7 @@ function MapViewer({ type, src }) {
     }
   }, [type, src, showGrid, showFogOfWar, gridSpacing]);
 
+  // Draws the grid lines on the canvas
   const drawGrid = (ctx, width, height, spacing) => {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
@@ -205,6 +213,7 @@ function MapViewer({ type, src }) {
     ctx.stroke();
   };
 
+  // Handles changes to grid spacing and updates the grid
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
     if (gridCanvasRef.current) {
@@ -217,6 +226,7 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Updates the grid lines on the canvas
   const updateGrid = (ctx, width, height, spacing) => {
     ctx.clearRect(0, 0, width, height);
     if (showGrid) {
@@ -224,18 +234,22 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Toggles the grid visibility
   const handleGridToggle = () => {
     setShowGrid(!showGrid);
   };
 
+  // Toggles the fog of war visibility
   const handleFogOfWarToggle = () => {
     setShowFogOfWar(!showFogOfWar);
   };
 
+  // Handles mode changes between view and edit
   const handleModeChange = (event, newMode) => {
     setMode(newMode);
   };
 
+  // Handles fog mode changes between spray and erase
   const handleFogModeChange = (event, newFogMode) => {
     setFogMode(newFogMode);
   };
@@ -249,6 +263,7 @@ function MapViewer({ type, src }) {
         overflow: "hidden",
       }}
     >
+      {/* Title of the application */}
       <Typography
         variant="h5"
         component="div"
@@ -264,6 +279,7 @@ function MapViewer({ type, src }) {
         Ptolemy
       </Typography>
 
+      {/* Control panel for toggling grid, fog of war, and ruler */}
       <Box
         sx={{
           position: "absolute",
@@ -409,6 +425,7 @@ function MapViewer({ type, src }) {
         )}
       </Box>
 
+      {/* Main interactive area with image or video and overlays */}
       <MapInteractionCSS
         value={{ scale, translation }}
         onChange={({ scale, translation }) => {
