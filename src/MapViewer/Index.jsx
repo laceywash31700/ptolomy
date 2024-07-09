@@ -9,6 +9,7 @@ import {
   Button,
   ToggleButton,
   ToggleButtonGroup,
+  TextField,
 } from "@mui/material";
 import { MapInteractionCSS } from "react-map-interaction";
 
@@ -31,6 +32,10 @@ function MapViewer({ type, src }) {
   const [spraying, setSpraying] = useState(false); // State to track if spraying is active
   const [mode, setMode] = useState("view"); // State to toggle between view and edit modes
   const [fogMode, setFogMode] = useState("spray"); // State to toggle between spray and erase modes for fog
+  const [unitDistance, setUnitDistance] = useState(5); // Distance each grid cell represents in feet
+  const [rulerActive, setRulerActive] = useState(false);
+  const [rulerStart, setRulerStart] = useState(null);
+  const [rulerEnd, setRulerEnd] = useState(null);
 
   // This useEffect adjusts the cursor based on the fog of war mode.
   // When in edit mode and fog of war is active, it changes the cursor
@@ -75,7 +80,6 @@ function MapViewer({ type, src }) {
       const fogCanvas = fogCanvasRef.current;
       const gridCanvas = gridCanvasRef.current;
       const ctx = canvas.getContext("2d");
-      const fogCtx = fogCanvas.getContext("2d");
       const gridCtx = gridCanvas.getContext("2d");
       const img = new Image();
       img.src = src;
@@ -116,13 +120,33 @@ function MapViewer({ type, src }) {
     }
   }, [type, src, showGrid, showFogOfWar, gridSpacing]);
 
-  // Function to update the grid based on current settings
-  const updateGrid = (ctx, width, height, spacing) => {
-    ctx.clearRect(0, 0, width, height);
-    if (showGrid) {
-      drawGrid(ctx, width, height, spacing);
-    }
-  };
+  useEffect(() => {
+    const handleRulerMouseMove = (event) => {
+      if (rulerActive && rulerStart && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        setRulerEnd({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+      }
+    };
+
+    const handleRulerMouseUp = () => {
+      if (rulerActive) {
+        drawLineWithDistance();
+        setRulerStart(null);
+        setRulerEnd(null);
+      }
+    };
+
+    window.addEventListener("mousemove", handleRulerMouseMove);
+    window.addEventListener("mouseup", handleRulerMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleRulerMouseMove);
+      window.removeEventListener("mouseup", handleRulerMouseUp);
+    };
+  }, [rulerActive, rulerStart]);
 
   // Draws grid lines on the grid canvas
   const drawGrid = (ctx, width, height, spacing) => {
@@ -140,14 +164,30 @@ function MapViewer({ type, src }) {
     ctx.stroke();
   };
 
-  // Toggles the grid visibility
-  const handleGridToggle = () => {
-    setShowGrid(!showGrid);
-  };
+  const drawLineWithDistance = () => {
+    if (rulerStart && rulerEnd && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+      ctx.beginPath();
+      ctx.moveTo(rulerStart.x, rulerStart.y);
+      ctx.lineTo(rulerEnd.x, rulerEnd.y);
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-  // Toggles the fog of war visibility
-  const handleFogOfWarToggle = () => {
-    setShowFogOfWar(!showFogOfWar);
+      const dx = rulerEnd.x - rulerStart.x;
+      const dy = rulerEnd.y - rulerStart.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distanceInUnits = (dist / gridSpacing) * unitDistance;
+
+      ctx.fillStyle = "yellow";
+      ctx.font = "16px Arial";
+      ctx.fillText(
+        `${distanceInUnits.toFixed(1)} ft`,
+        (rulerStart.x + rulerEnd.x) / 2,
+        (rulerStart.y + rulerEnd.y) / 2 - 10
+      );
+    }
   };
 
   // Updates the grid spacing based on user input
@@ -163,6 +203,29 @@ function MapViewer({ type, src }) {
     }
   };
 
+  // Function to update the grid based on current settings
+  const updateGrid = (ctx, width, height, spacing) => {
+    ctx.clearRect(0, 0, width, height);
+    if (showGrid) {
+      drawGrid(ctx, width, height, spacing);
+    }
+  };
+
+  const handleRulerToggle = () => {
+    setRulerActive(!rulerActive);
+  };
+
+
+  // Toggles the grid visibility
+  const handleGridToggle = () => {
+    setShowGrid(!showGrid);
+  };
+
+  // Toggles the fog of war visibility
+  const handleFogOfWarToggle = () => {
+    setShowFogOfWar(!showFogOfWar);
+  };
+
   // Changes the mode between view and edit
   const handleModeChange = (event, newMode) => {
     setMode(newMode);
@@ -174,19 +237,19 @@ function MapViewer({ type, src }) {
   };
 
   // Activates spraying when mouse is pressed down
-  const handleMouseDown = () => {
+  const handleFogMouseDown = () => {
     if (mode === "edit" && showFogOfWar) {
       setSpraying(true);
     }
   };
 
   // Deactivates spraying when mouse is released
-  const handleMouseUp = () => {
+  const handleFogMouseUp = () => {
     setSpraying(false);
   };
 
   // Handles the application of fog or erasing based on mouse movement
-  const handleMouseMove = (event) => {
+  const handleFogMouseMove = (event) => {
     if (spraying && showFogOfWar) {
       const fogCanvas = fogCanvasRef.current;
       const fogCtx = fogCanvas.getContext("2d");
@@ -224,7 +287,7 @@ function MapViewer({ type, src }) {
           color: "white",
         }}
       >
-        Map Viewer
+        Ptolemy
       </Typography>
 
       <Box
@@ -236,20 +299,22 @@ function MapViewer({ type, src }) {
           color: "white",
           display: "flex",
           flexDirection: "column",
+          gap: 2, // This sets a consistent gap between children
         }}
       >
         <FormControlLabel
           control={<Checkbox checked={showGrid} onChange={handleGridToggle} />}
-          label="Show Grid"
+          label="Grid"
           sx={{ color: "white" }}
         />
+
         {showGrid && (
           <>
             <Button
               variant="contained"
               color="primary"
               onClick={() => setShowGridSettings(!showGridSettings)}
-              sx={{ marginTop: 1 }}
+              sx={{ mt: 2 }} // More space above the button
             >
               Grid Settings
             </Button>
@@ -259,50 +324,119 @@ function MapViewer({ type, src }) {
                 onChange={handleGridSpacingChange}
                 min={10}
                 max={200}
-                sx={{ marginTop: 2, color: "white" }}
+                sx={{ mt: 2, color: "white" }} // Adds space above the slider
                 aria-labelledby="grid-spacing-slider"
               />
             )}
           </>
         )}
+
         <FormControlLabel
           control={
             <Checkbox checked={showFogOfWar} onChange={handleFogOfWarToggle} />
           }
           label="Fog of War"
-          sx={{ color: "white" }}
+          sx={{ mt: 2 }} // Added margin top for spacing
         />
-        {showFogOfWar && (
-          <>
-            <ToggleButtonGroup
-              value={mode}
-              exclusive
-              onChange={handleModeChange}
-              sx={{ marginTop: 2 }}
-            >
-              <ToggleButton value="view" sx={{ color: "white" }}>
-                View
-              </ToggleButton>
-              <ToggleButton value="edit" sx={{ color: "white" }}>
-                Edit
-              </ToggleButton>
-            </ToggleButtonGroup>
-            {mode === "edit" && (
-              <ToggleButtonGroup
-                value={fogMode}
-                exclusive
-                onChange={handleFogModeChange}
-                sx={{ marginTop: 2 }}
-              >
-                <ToggleButton value="spray" sx={{ color: "white" }}>
-                  Spray Fog
-                </ToggleButton>
-                <ToggleButton value="erase" sx={{ color: "white" }}>
-                  Erase Fog
-                </ToggleButton>
-              </ToggleButtonGroup>
-            )}
-          </>
+
+        <FormControlLabel
+          control={
+            <Checkbox checked={rulerActive} onChange={handleRulerToggle} />
+          }
+          label="Ruler Tool"
+          sx={{ mt: 2 }} // Consistent spacing
+        />
+
+        {(showFogOfWar || rulerActive) && (
+          <ToggleButtonGroup
+            color="primary"
+            value={mode}
+            exclusive
+            onChange={handleModeChange}
+            sx={{
+              mt: 2, // Space above the toggle button group
+              "& .MuiToggleButton-root": {
+                // Applies to all toggle buttons
+                color: "white", // Default color for inactive buttons
+                "&.Mui-selected": {
+                  // Styles for the active (selected) button
+                  color: "Cyan", // Bright blue text color when active
+                  backgroundColor: "rgba(0, 123, 255, 0.1)", // Optional: light blue background for active state
+                },
+                "&:hover": {
+                  // Hover styles
+                  backgroundColor: "rgba(255, 255, 255, 0.1)", // Light hover effect for all buttons
+                },
+              },
+            }}
+          >
+            <ToggleButton value="view" sx={{ color: "inherit" }}>
+              View
+            </ToggleButton>
+            <ToggleButton value="edit" sx={{ color: "inherit" }}>
+              Edit
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+
+        {showFogOfWar && mode === "edit" && (
+          <ToggleButtonGroup
+            value={fogMode}
+            exclusive
+            onChange={handleFogModeChange}
+            sx={{
+              mt: 2, // Space above the toggle button group
+              "& .MuiToggleButton-root": {
+                color: "white", // Default color for inactive buttons
+                "&.Mui-selected": {
+                  // Styles for the active (selected) button
+                  color: "Cyan", // Bright blue text color when active
+                  backgroundColor: "rgba(0, 123, 255, 0.1)", // Optional: light blue background for active state
+                },
+                "&:hover": {
+                  // Hover styles
+                  backgroundColor: "rgba(255, 255, 255, 0.1)", // Light hover effect for all buttons
+                },
+              },
+            }}
+          >
+            <ToggleButton value="spray" sx={{ color: "inherit" }}>
+              Spray Fog
+            </ToggleButton>
+            <ToggleButton value="erase" sx={{ color: "inherit" }}>
+              Erase Fog
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+
+        {rulerActive && (
+          <TextField
+            label="Unit Distance (ft)"
+            type="number"
+            value={unitDistance}
+            onChange={(e) => setUnitDistance(Number(e.target.value))}
+            InputProps={{
+              inputProps: { min: 1, max: 100 },
+              style: { color: "white" },
+            }}
+            InputLabelProps={{
+              style: { color: "white" },
+            }}
+            sx={{
+              mt: 2, // Spacing above the text field
+              width: "120px",
+              bgcolor: "black",
+              "& .MuiInput-underline:before": {
+                borderBottomColor: "white",
+              },
+              "& .MuiInput-underline:hover:before": {
+                borderBottomColor: ["white", "!important"],
+              },
+              "& .MuiInput-underline:after": {
+                borderBottomColor: "white",
+              },
+            }}
+          />
         )}
       </Box>
 
@@ -347,9 +481,9 @@ function MapViewer({ type, src }) {
             />
             <canvas
               ref={fogCanvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
+              onMouseDown={handleFogMouseDown}
+              onMouseUp={handleFogMouseUp}
+              onMouseMove={handleFogMouseMove}
               style={{
                 position: "absolute",
                 top: 0,
