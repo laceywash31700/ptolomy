@@ -23,7 +23,7 @@ function App() {
     backgroundSize: '100%', 
     backgroundPosition: 'center',
     filter: "blur(30px)",
-    zIndex: -1
+    zIndex: -10
   };
   return (
     <Container maxWidth="false" disableGutters>
