@@ -51,10 +51,10 @@ function MapViewer({ type, src }) {
     } else if (rulerActive && fogCanvasRef.current) {
       const rect = fogCanvasRef.current.getBoundingClientRect();
       setRulerStart({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: (event.clientX - rect.left) / scale,
+        y: (event.clientY - rect.top) / scale,
       });
-      setRulerEnd(null); // Reset ruler end point
+      setRulerEnd(null);
     }
   };
 
@@ -64,8 +64,8 @@ function MapViewer({ type, src }) {
       const fogCanvas = fogCanvasRef.current;
       const fogCtx = fogCanvas.getContext("2d");
       const rect = fogCanvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+      const x = (event.clientX - rect.left) / scale;
+      const y = (event.clientY - rect.top) / scale;
 
       fogCtx.globalCompositeOperation =
         fogMode === "erase" ? "destination-out" : "source-over";
@@ -76,8 +76,8 @@ function MapViewer({ type, src }) {
     } else if (rulerActive && rulerStart && fogCanvasRef.current) {
       const rect = fogCanvasRef.current.getBoundingClientRect();
       setRulerEnd({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: (event.clientX - rect.left) / scale,
+        y: (event.clientY - rect.top) / scale,
       });
       drawTemporaryLine();
     }
