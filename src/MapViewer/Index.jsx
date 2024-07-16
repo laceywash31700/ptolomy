@@ -37,11 +37,25 @@ function MapViewer({ type, src }) {
   const [rulerStart, setRulerStart] = useState(null); // State to store start point of ruler
   const [rulerEnd, setRulerEnd] = useState(null); // State to store end point of ruler
 
+  const [tokens, setTokens] = useState([]); // State to store tokens
+  const [draggingToken, setDraggingToken] = useState(null); // State to store the token being dragged
+
   // Toggles the ruler tool
   const handleRulerToggle = () => {
     setRulerActive(!rulerActive);
     setRulerStart(null);
     setRulerEnd(null);
+  };
+  // Adds a new token
+  const addToken = (url) => {
+    const newToken = {
+      url,
+      name: "Token",
+      effect: [],
+      position: { x: 0, y: 0 },
+      size: gridSpacing, // Initial size fits one grid space
+    };
+    setTokens([...tokens, newToken]);
   };
 
   // Handles mouse down event for fog of war and ruler tool
@@ -55,10 +69,25 @@ function MapViewer({ type, src }) {
         y: (event.clientY - rect.top) / scale,
       });
       setRulerEnd(null);
+    } else if (!rulerActive) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / scale;
+      const y = (event.clientY - rect.top) / scale;
+      const token = tokens.find(
+        (t) =>
+          x >= t.position.x &&
+          x <= t.position.x + t.size &&
+          y >= t.position.y &&
+          y <= t.position.y + t.size
+      );
+      if (token) {
+        setDraggingToken(token);
+      }
     }
   };
 
   // Handles mouse move event for fog of war and ruler tool
+  // Handles mouse move event for fog of war, ruler tool, and token dragging
   const handleMouseMove = (event) => {
     if (spraying && showFogOfWar) {
       const fogCanvas = fogCanvasRef.current;
@@ -80,12 +109,21 @@ function MapViewer({ type, src }) {
         y: (event.clientY - rect.top) / scale,
       });
       drawTemporaryLine();
+    } else if (draggingToken) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / scale;
+      const y = (event.clientY - rect.top) / scale;
+      const updatedTokens = tokens.map((token) =>
+        token === draggingToken ? { ...token, position: { x, y } } : token
+      );
+      setTokens(updatedTokens);
     }
   };
 
-  // Handles mouse up event to stop spraying and clear the ruler line
+  // Handles mouse up event to stop spraying and dragging, and clear the ruler line
   const handleMouseUp = () => {
     setSpraying(false);
+    setDraggingToken(null);
     if (rulerActive && rulerStart) {
       if (fogCanvasRef.current) {
         const ctx = fogCanvasRef.current.getContext("2d");
@@ -118,7 +156,11 @@ function MapViewer({ type, src }) {
       // Display distance
       ctx.font = "16px Arial";
       ctx.fillStyle = "white";
-      ctx.fillText(`${distance} ft`, (rulerStart.x + rulerEnd.x) / 2, (rulerStart.y + rulerEnd.y) / 2);
+      ctx.fillText(
+        `${distance} ft`,
+        (rulerStart.x + rulerEnd.x) / 2,
+        (rulerStart.y + rulerEnd.y) / 2
+      );
     }
   };
 
@@ -253,6 +295,38 @@ function MapViewer({ type, src }) {
   const handleFogModeChange = (event, newFogMode) => {
     setFogMode(newFogMode);
   };
+
+  const drawTokens = () => {
+    if (fogCanvasRef.current) {
+      const ctx = fogCanvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+      tokens.forEach((token) => {
+        const img = new Image();
+        img.src = token.url;
+        img.onload = () => {
+          ctx.drawImage(
+            img,
+            token.position.x,
+            token.position.y,
+            token.size,
+            token.size
+          );
+        };
+      });
+    }
+  };
+
+  // Adjusts the size of the selected token
+  const handleTokenResize = (token, newSize) => {
+    const updatedTokens = tokens.map((t) =>
+      t === token ? { ...t, size: newSize } : t
+    );
+    setTokens(updatedTokens);
+  };
+
+  useEffect(() => {
+    drawTokens();
+  }, [tokens]);
 
   return (
     <Box
@@ -423,6 +497,15 @@ function MapViewer({ type, src }) {
             }}
           />
         )}
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => addToken("/Darius.jpeg")}
+          sx={{ mt: 2 }}
+        >
+          Add Token
+        </Button>
       </Box>
 
       {/* Main interactive area with image or video and overlays */}
@@ -495,3 +578,4 @@ function MapViewer({ type, src }) {
 }
 
 export default MapViewer;
+
