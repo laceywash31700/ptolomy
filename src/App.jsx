@@ -9,6 +9,7 @@ function App() {
   const [maps, setMaps] = useState([]);
   const [mapType, setMapType] = useState("image");
   const [mapSrc, setMapSrc] = useState("/FeyRuinsAutumn.jpg");
+  const [tokenSrc, setTokenSrc] = useState("/Darius.jpeg")
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -42,7 +43,7 @@ function App() {
           <AddIcon />
         </Fab>
         <Maps open={open} handleClose={handleClose} maps={maps} />
-        <MapViewer type={mapType} src={mapSrc} />
+        <MapViewer type={mapType} src={mapSrc} token={tokenSrc} />
       </Box>
     </Container>
   );

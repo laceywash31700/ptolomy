@@ -11,204 +11,76 @@ import {
   ToggleButtonGroup,
   TextField,
 } from "@mui/material";
-import { MapInteractionCSS } from "react-map-interaction";
+import { Stage, Layer, Rect, Image as KonvaImage, Line } from "react-konva";
+import useImage from "use-image";
 
 function MapViewer({ type, src }) {
-  const canvasRef = useRef(null); // Main canvas reference
-  const fogCanvasRef = useRef(null); // Fog of war canvas reference
-  const gridCanvasRef = useRef(null); // Grid canvas reference
-  const [dimensions, setDimensions] = useState({
-    width: 0,
-    height: 0,
-    x: 0,
-    y: 0,
-  }); // State for storing canvas dimensions
-  const [scale, setScale] = useState(1.1); // State for scaling the canvas
-  const [translation, setTranslation] = useState({ x: 0, y: 0 }); // State for canvas translation
-  const [gridSpacing, setGridSpacing] = useState(50); // State for grid spacing
-  const [showGrid, setShowGrid] = useState(false); // State to show/hide grid
-  const [showFogOfWar, setShowFogOfWar] = useState(false); // State to show/hide fog of war
-  const [showGridSettings, setShowGridSettings] = useState(false); // State to show/hide grid settings slider
-  const [spraying, setSpraying] = useState(false); // State to track if fog of war is being sprayed
-  const [mode, setMode] = useState("view"); // State to track mode (view or edit)
-  const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
-  const [unitDistance, setUnitDistance] = useState(5); // State to set the unit distance for ruler
-  const [rulerActive, setRulerActive] = useState(false); // State to track if ruler is active
-  const [rulerStart, setRulerStart] = useState(null); // State to store start point of ruler
-  const [rulerEnd, setRulerEnd] = useState(null); // State to store end point of ruler
+  const stageRef = useRef(null); // Reference to the Konva Stage
+  const startDragOffset = useRef({ x: 0, y: 0 });
+  const draggingStage = useRef(false);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [scale, setScale] = useState(1.1);
+  const [translation, setTranslation] = useState({ x: 0, y: 0 });
+  const [gridSpacing, setGridSpacing] = useState(50);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showFogOfWar, setShowFogOfWar] = useState(false);
+  const [showGridSettings, setShowGridSettings] = useState(false);
+  const [spraying, setSpraying] = useState(false);
+  const [mode, setMode] = useState("view");
+  const [fogMode, setFogMode] = useState("spray");
+  const [unitDistance, setUnitDistance] = useState(5);
+  const [rulerActive, setRulerActive] = useState(false);
+  const [rulerStart, setRulerStart] = useState(null);
+  const [rulerEnd, setRulerEnd] = useState(null);
+  const [tokens, setTokens] = useState([]);
+  const [image] = useImage(src); // Load main image using useImage hook
 
-  const [tokens, setTokens] = useState([]); // State to store tokens
-  const [draggingToken, setDraggingToken] = useState(null); // State to store the token being dragged
-
-  // Toggles the ruler tool
-  const handleRulerToggle = () => {
-    setRulerActive(!rulerActive);
-    setRulerStart(null);
-    setRulerEnd(null);
-  };
-  // Adds a new token
+  // Add a new token to the map
   const addToken = (url) => {
-    const newToken = {
-      url,
-      name: "Token",
-      effect: [],
-      position: { x: 0, y: 0 },
-      size: gridSpacing, // Initial size fits one grid space
+    const img = new window.Image();
+    img.src = url;
+    img.onload = () => {
+      const newToken = {
+        image: img,
+        name: "Token",
+        effect: [],
+        position: { x: 0, y: 0 },
+        size: gridSpacing,
+      };
+      setTokens((prevTokens) => [...prevTokens, newToken]);
     };
-    setTokens([...tokens, newToken]);
   };
 
-  // Handles mouse down event for fog of war and ruler tool
-  const handleMouseDown = (event) => {
-    if (mode === "edit" && showFogOfWar) {
-      setSpraying(true);
-    } else if (rulerActive && fogCanvasRef.current) {
-      const rect = fogCanvasRef.current.getBoundingClientRect();
-      setRulerStart({
-        x: (event.clientX - rect.left) / scale,
-        y: (event.clientY - rect.top) / scale,
-      });
-      setRulerEnd(null);
-    } else if (!rulerActive) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / scale;
-      const y = (event.clientY - rect.top) / scale;
-      const token = tokens.find(
-        (t) =>
-          x >= t.position.x &&
-          x <= t.position.x + t.size &&
-          y >= t.position.y &&
-          y <= t.position.y + t.size
-      );
-      if (token) {
-        setDraggingToken(token);
-      }
-    }
+  // Handle zooming with the mouse wheel
+  const handleWheel = (e) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const newScale = e.evt.deltaY > 0 ? oldScale * 1.1 : oldScale / 1.1;
+    setScale(newScale);
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    setTranslation(newPos);
   };
 
-  // Handles mouse move event for fog of war and ruler tool
-  // Handles mouse move event for fog of war, ruler tool, and token dragging
-  const handleMouseMove = (event) => {
-    if (spraying && showFogOfWar) {
-      const fogCanvas = fogCanvasRef.current;
-      const fogCtx = fogCanvas.getContext("2d");
-      const rect = fogCanvas.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / scale;
-      const y = (event.clientY - rect.top) / scale;
-
-      fogCtx.globalCompositeOperation =
-        fogMode === "erase" ? "destination-out" : "source-over";
-
-      fogCtx.beginPath();
-      fogCtx.arc(x, y, 20, 0, 2 * Math.PI);
-      fogCtx.fill();
-    } else if (rulerActive && rulerStart && fogCanvasRef.current) {
-      const rect = fogCanvasRef.current.getBoundingClientRect();
-      setRulerEnd({
-        x: (event.clientX - rect.left) / scale,
-        y: (event.clientY - rect.top) / scale,
-      });
-      drawTemporaryLine();
-    } else if (draggingToken) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / scale;
-      const y = (event.clientY - rect.top) / scale;
-      const updatedTokens = tokens.map((token) =>
-        token === draggingToken ? { ...token, position: { x, y } } : token
-      );
-      setTokens(updatedTokens);
-    }
-  };
-
-  // Handles mouse up event to stop spraying and dragging, and clear the ruler line
-  const handleMouseUp = () => {
-    setSpraying(false);
-    setDraggingToken(null);
-    if (rulerActive && rulerStart) {
-      if (fogCanvasRef.current) {
-        const ctx = fogCanvasRef.current.getContext("2d");
-        ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      }
-      setRulerStart(null);
-      setRulerEnd(null);
-    }
-  };
-
-  // Draws the temporary ruler line and calculates the distance
-  const drawTemporaryLine = () => {
-    if (rulerStart && rulerEnd && fogCanvasRef.current) {
-      const ctx = fogCanvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      ctx.beginPath();
-      ctx.moveTo(rulerStart.x, rulerStart.y);
-      ctx.lineTo(rulerEnd.x, rulerEnd.y);
-      ctx.strokeStyle = "red";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Calculate distance
-      const dx = rulerEnd.x - rulerStart.x;
-      const dy = rulerEnd.y - rulerStart.y;
-      const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-      const gridDistance = pixelDistance / gridSpacing;
-      const distance = Math.round(gridDistance) * unitDistance;
-
-      // Display distance
-      ctx.font = "16px Arial";
-      ctx.fillStyle = "white";
-      ctx.fillText(
-        `${distance} ft`,
-        (rulerStart.x + rulerEnd.x) / 2,
-        (rulerStart.y + rulerEnd.y) / 2
-      );
-    }
-  };
-
-  // Effect to update cursor style based on fog mode and edit mode
+  // Load the main image and set dimensions
   useEffect(() => {
-    if (fogCanvasRef.current) {
-      if (mode === "edit" && showFogOfWar) {
-        switch (fogMode) {
-          case "spray":
-            fogCanvasRef.current.style.cursor =
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='white' stroke-width='2'/></svg>\"), auto";
-            break;
-          case "erase":
-            fogCanvasRef.current.style.cursor =
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='red' stroke-width='2'/></svg>\"), auto";
-            break;
-          default:
-            fogCanvasRef.current.style.cursor = "auto";
-            break;
-        }
-      } else {
-        fogCanvasRef.current.style.cursor = "auto";
-      }
-    }
-  }, [mode, fogMode, showFogOfWar]);
-
-  // Effect to load the image and initialize canvas dimensions and grid
-  useEffect(() => {
-    if (
-      type === "image" &&
-      canvasRef.current &&
-      fogCanvasRef.current &&
-      gridCanvasRef.current
-    ) {
-      const canvas = canvasRef.current;
-      const fogCanvas = fogCanvasRef.current;
-      const gridCanvas = gridCanvasRef.current;
-      const ctx = canvas.getContext("2d");
-      const gridCtx = gridCanvas.getContext("2d");
+    if (type === "image" && image) {
       const img = new Image();
       img.src = src;
       img.onload = () => {
         const maxWidth = window.innerWidth * 0.8;
         const maxHeight = window.innerHeight * 0.9;
-        const scaleFactor = Math.min(
-          maxWidth / img.width,
-          maxHeight / img.height
-        );
+        const scaleFactor = Math.min(maxWidth / img.width, maxHeight / img.height);
 
         const scaledWidth = img.width * scaleFactor;
         const scaledHeight = img.height * scaleFactor;
@@ -216,117 +88,99 @@ function MapViewer({ type, src }) {
         setDimensions({
           width: scaledWidth,
           height: scaledHeight,
-          x: (window.innerWidth - scaledWidth) / 2,
-          y: (window.innerHeight - scaledHeight) / 2,
         });
         setTranslation({
           x: (window.innerWidth - scaledWidth) / 2,
           y: (window.innerHeight - scaledHeight) / 2,
         });
-
-        canvas.width = scaledWidth;
-        canvas.height = scaledHeight;
-        fogCanvas.width = scaledWidth;
-        fogCanvas.height = scaledHeight;
-        gridCanvas.width = scaledWidth;
-        gridCanvas.height = scaledHeight;
-
-        ctx.clearRect(0, 0, scaledWidth, scaledHeight);
-        ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-
-        updateGrid(gridCtx, scaledWidth, scaledHeight, gridSpacing);
       };
     }
-  }, [type, src, showGrid, showFogOfWar, gridSpacing]);
+  }, [type, src, image]);
 
-  // Draws the grid lines on the canvas
-  const drawGrid = (ctx, width, height, spacing) => {
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-    ctx.lineWidth = 1;
-    for (let x = spacing; x < width; x += spacing) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-    }
-    for (let y = spacing; y < height; y += spacing) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-    }
-    ctx.stroke();
-  };
-
-  // Handles changes to grid spacing and updates the grid
+  // Handle changes to grid spacing
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
-    if (gridCanvasRef.current) {
-      updateGrid(
-        gridCanvasRef.current.getContext("2d"),
-        dimensions.width,
-        dimensions.height,
-        newValue
-      );
-    }
   };
 
-  // Updates the grid lines on the canvas
-  const updateGrid = (ctx, width, height, spacing) => {
-    ctx.clearRect(0, 0, width, height);
-    if (showGrid) {
-      drawGrid(ctx, width, height, spacing);
-    }
-  };
-
-  // Toggles the grid visibility
+  // Toggle the grid visibility
   const handleGridToggle = () => {
     setShowGrid(!showGrid);
   };
 
-  // Toggles the fog of war visibility
+  // Toggle the fog of war visibility
   const handleFogOfWarToggle = () => {
     setShowFogOfWar(!showFogOfWar);
   };
 
-  // Handles mode changes between view and edit
+  // Change the mode between view and edit
   const handleModeChange = (event, newMode) => {
     setMode(newMode);
   };
 
-  // Handles fog mode changes between spray and erase
+  // Change the fog mode between spray and erase
   const handleFogModeChange = (event, newFogMode) => {
     setFogMode(newFogMode);
   };
 
-  const drawTokens = () => {
-    if (fogCanvasRef.current) {
-      const ctx = fogCanvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      tokens.forEach((token) => {
-        const img = new Image();
-        img.src = token.url;
-        img.onload = () => {
-          ctx.drawImage(
-            img,
-            token.position.x,
-            token.position.y,
-            token.size,
-            token.size
-          );
-        };
-      });
+  // Toggle the ruler tool
+  const handleRulerToggle = () => {
+    setRulerActive(!rulerActive);
+    setRulerStart(null);
+    setRulerEnd(null);
+  };
+
+  // Handle mouse down events on the stage
+  const handleStageMouseDown = (e) => {
+    if (mode === "view") {
+      const isElement = e.target.className === "Image";
+      if (isElement) {
+        return;
+      }
+      draggingStage.current = true;
+      startDragOffset.current = {
+        x: e.evt.clientX - stageRef.current.x(),
+        y: e.evt.clientY - stageRef.current.y(),
+      };
+    } else if (rulerActive) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const adjustedPointerPos = {
+        x: (pointerPos.x - stage.x()) / stage.scaleX(),
+        y: (pointerPos.y - stage.y()) / stage.scaleY(),
+      };
+      setRulerStart(adjustedPointerPos);
+      setRulerEnd(null);
     }
   };
 
-  // Adjusts the size of the selected token
-  const handleTokenResize = (token, newSize) => {
-    const updatedTokens = tokens.map((t) =>
-      t === token ? { ...t, size: newSize } : t
-    );
-    setTokens(updatedTokens);
+  // Handle mouse move events on the stage
+  const handleStageMouseMove = (e) => {
+    if (draggingStage.current) {
+      const stage = stageRef.current;
+      stage.position({
+        x: e.evt.clientX - startDragOffset.current.x,
+        y: e.evt.clientY - startDragOffset.current.y,
+      });
+      stage.batchDraw();
+    } else if (rulerActive && rulerStart) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const adjustedPointerPos = {
+        x: (pointerPos.x - stage.x()) / stage.scaleX(),
+        y: (pointerPos.y - stage.y()) / stage.scaleY(),
+      };
+      setRulerEnd(adjustedPointerPos);
+    }
   };
 
-  useEffect(() => {
-    drawTokens();
-  }, [tokens]);
+  // Handle mouse up events on the stage
+  const handleStageMouseUp = () => {
+    draggingStage.current = false;
+    if (rulerActive && rulerStart) {
+      setRulerStart(null);
+      setRulerEnd(null);
+    }
+  };
 
   return (
     <Box
@@ -509,73 +363,100 @@ function MapViewer({ type, src }) {
       </Box>
 
       {/* Main interactive area with image or video and overlays */}
-      <MapInteractionCSS
-        value={{ scale, translation }}
-        onChange={({ scale, translation }) => {
-          setScale(scale);
-          setTranslation(translation);
-        }}
-        showControls={mode === "view"}
-        disableZoom={mode === "edit"}
-        disablePan={mode === "edit"}
-        sx={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+      <Stage
+        width={window.innerWidth}
+        height={window.innerHeight}
+        scaleX={scale}
+        scaleY={scale}
+        x={translation.x}
+        y={translation.y}
+        onWheel={handleWheel}
+        onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
+        onMouseUp={handleStageMouseUp}
+        ref={stageRef}
+        draggable={mode === "view"}
       >
-        {type === "image" && (
-          <div
-            style={{
-              position: "relative",
-              width: `${dimensions.width}px`,
-              height: `${dimensions.height}px`,
-            }}
-          >
-            <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
-            <canvas
-              ref={gridCanvasRef}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
+        <Layer>
+          {type === "image" && image && (
+            <KonvaImage
+              image={image}
+              width={dimensions.width}
+              height={dimensions.height}
+            />
+          )}
+          {type !== "image" && (
+            <ReactPlayer
+              url={src}
+              controls={true}
+              width="100%"
+              height="100%"
+              style={{ position: "relative" }}
+            />
+          )}
+        </Layer>
+        {showGrid && (
+          <Layer>
+            {[...Array(Math.ceil(dimensions.width / gridSpacing)).keys()].map((i) => (
+              <Line
+                points={[i * gridSpacing, 0, i * gridSpacing, dimensions.height]}
+                stroke="rgba(255, 255, 255, 0.5)"
+                strokeWidth={1}
+                key={`v${i}`}
+              />
+            ))}
+            {[...Array(Math.ceil(dimensions.height / gridSpacing)).keys()].map((i) => (
+              <Line
+                points={[0, i * gridSpacing, dimensions.width, i * gridSpacing]}
+                stroke="rgba(255, 255, 255, 0.5)"
+                strokeWidth={1}
+                key={`h${i}`}
+              />
+            ))}
+          </Layer>
+        )}
+        {showFogOfWar && (
+          <Layer id="fogLayer">
+            <Rect
+              width={dimensions.width}
+              height={dimensions.height}
+              fill="rgba(0,0,0,0.5)"
+            />
+          </Layer>
+        )}
+        <Layer id="tokenLayer">
+          {tokens.map((token, index) => (
+            <KonvaImage
+              key={index}
+              image={token.image}
+              x={token.position.x}
+              y={token.position.y}
+              width={token.size}
+              height={token.size}
+              draggable
+              onDragEnd={(e) => {
+                const updatedTokens = tokens.map((t) =>
+                  t === token
+                    ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
+                    : t
+                );
+                setTokens(updatedTokens);
               }}
             />
-            <canvas
-              ref={fogCanvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-              }}
+          ))}
+        </Layer>
+        <Layer id="rulerLayer">
+          {rulerStart && rulerEnd && (
+            <Line
+              points={[rulerStart.x, rulerStart.y, rulerEnd.x, rulerEnd.y]}
+              stroke="red"
+              strokeWidth={2}
             />
-          </div>
-        )}
-        {type !== "image" && (
-          <ReactPlayer
-            url={src}
-            controls={true}
-            width="100%"
-            height="100%"
-            style={{ position: "relative" }}
-          />
-        )}
-      </MapInteractionCSS>
+          )}
+        </Layer>
+      </Stage>
     </Box>
   );
 }
 
 export default MapViewer;
-
