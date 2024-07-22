@@ -18,6 +18,8 @@ function MapViewer({ type, src }) {
   const stageRef = useRef(null); // Reference to the Konva Stage
   const startDragOffset = useRef({ x: 0, y: 0 });
   const draggingStage = useRef(false);
+  const fogLayerRef = useRef(null); // Reference to the fog layer
+  const fogCanvasRef = useRef(null); // Reference to the fog canvas
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [scale, setScale] = useState(1.1);
   const [translation, setTranslation] = useState({ x: 0, y: 0 });
@@ -97,6 +99,18 @@ function MapViewer({ type, src }) {
     }
   }, [type, src, image]);
 
+  // Apply fog to the entire map
+  const applyFogToEntireMap = () => {
+    const fogCanvas = fogCanvasRef.current;
+    if (fogCanvas) {
+      const fogCtx = fogCanvas.getContext("2d");
+      fogCtx.clearRect(0, 0, dimensions.width, dimensions.height);
+      fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      fogCtx.fillRect(0, 0, dimensions.width, dimensions.height);
+      fogLayerRef.current.getLayer().batchDraw();
+    }
+  };
+
   // Handle changes to grid spacing
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
@@ -150,6 +164,8 @@ function MapViewer({ type, src }) {
       };
       setRulerStart(adjustedPointerPos);
       setRulerEnd(null);
+    } else if (mode === "edit" && showFogOfWar) {
+      setSpraying(true);
     }
   };
 
@@ -170,17 +186,64 @@ function MapViewer({ type, src }) {
         y: (pointerPos.y - stage.y()) / stage.scaleY(),
       };
       setRulerEnd(adjustedPointerPos);
+    } else if (spraying) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const fogCanvas = fogCanvasRef.current;
+      if (fogCanvas) {
+        const fogCtx = fogCanvas.getContext("2d");
+        const x = (pointerPos.x - stage.x()) / stage.scaleX();
+        const y = (pointerPos.y - stage.y()) / stage.scaleY();
+  
+        if (fogMode === "spray") {
+          fogCtx.globalCompositeOperation = "source-over";
+          fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        } else if (fogMode === "erase") {
+          fogCtx.globalCompositeOperation = "destination-out";
+        }
+  
+        fogCtx.beginPath();
+        fogCtx.arc(x, y, 20, 0, 2 * Math.PI);
+        fogCtx.fill();
+        fogLayerRef.current.getLayer().batchDraw();
+      }
     }
   };
+  
+  
 
   // Handle mouse up events on the stage
   const handleStageMouseUp = () => {
     draggingStage.current = false;
+    setSpraying(false);
     if (rulerActive && rulerStart) {
       setRulerStart(null);
       setRulerEnd(null);
     }
   };
+
+  // Change the cursor style based on fog mode and edit mode
+  useEffect(() => {
+    if (stageRef.current) {
+      if (mode === "edit" && showFogOfWar) {
+        switch (fogMode) {
+          case "spray":
+            stageRef.current.container().style.cursor =
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='purple' stroke-width='2'/></svg>\"), auto";
+            break;
+          case "erase":
+            stageRef.current.container().style.cursor =
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='red' stroke-width='2'/></svg>\"), auto";
+            break;
+          default:
+            stageRef.current.container().style.cursor = "auto";
+            break;
+        }
+      } else {
+        stageRef.current.container().style.cursor = "auto";
+      }
+    }
+  }, [mode, fogMode, showFogOfWar]);
 
   return (
     <Box
@@ -256,6 +319,17 @@ function MapViewer({ type, src }) {
           label="Fog of War"
           sx={{ mt: 2 }}
         />
+
+        {showFogOfWar && (
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={applyFogToEntireMap}
+            sx={{ mt: 2 }}
+          >
+            Apply Fog to Entire Map
+          </Button>
+        )}
 
         <FormControlLabel
           control={
@@ -416,11 +490,11 @@ function MapViewer({ type, src }) {
           </Layer>
         )}
         {showFogOfWar && (
-          <Layer id="fogLayer">
-            <Rect
+          <Layer id="fogLayer" ref={fogLayerRef}>
+            <KonvaImage
+              image={fogCanvasRef.current} // Use the fog canvas as the source image
               width={dimensions.width}
               height={dimensions.height}
-              fill="rgba(0,0,0,0.5)"
             />
           </Layer>
         )}
@@ -455,6 +529,14 @@ function MapViewer({ type, src }) {
           )}
         </Layer>
       </Stage>
+
+      {/* Hidden canvas used for fog of war */}
+      <canvas
+        ref={fogCanvasRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        style={{ display: "none" }}
+      />
     </Box>
   );
 }
