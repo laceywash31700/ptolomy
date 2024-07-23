@@ -11,7 +11,11 @@ import {
   ToggleButtonGroup,
   TextField,
 } from "@mui/material";
-import { Stage, Layer, Rect, Image as KonvaImage, Line } from "react-konva";
+import { Stage, Layer, Group, Rect, Image as KonvaImage, Line } from "react-konva";
+import EditIcon from "/edit.png"; // Update with the correct path
+import DeleteIcon from "/bin.png"; // Update with the correct path
+import BloodiedIcon from "/blood.png"; // Update with the correct path
+import DeadIcon from "/skull.png"; // Update with the correct path
 import useImage from "use-image";
 
 function MapViewer({ type, src }) {
@@ -26,6 +30,7 @@ function MapViewer({ type, src }) {
   const [gridSpacing, setGridSpacing] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
   const [showFogOfWar, setShowFogOfWar] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [showGridSettings, setShowGridSettings] = useState(false);
   const [spraying, setSpraying] = useState(false);
   const [mode, setMode] = useState("view");
@@ -34,8 +39,28 @@ function MapViewer({ type, src }) {
   const [rulerActive, setRulerActive] = useState(false);
   const [rulerStart, setRulerStart] = useState(null);
   const [rulerEnd, setRulerEnd] = useState(null);
+  const [selectedToken, setSelectedToken] = useState(null);
   const [tokens, setTokens] = useState([]);
   const [image] = useImage(src); // Load main image using useImage hook
+  const [editIcon] = useImage(EditIcon);
+  const [deleteIcon] = useImage(DeleteIcon);
+  const [bloodiedIcon] = useImage(BloodiedIcon);
+  const [deadIcon] = useImage(DeadIcon);
+
+  // Handle changes to grid spacing
+  const handleGridSpacingChange = (event, newValue) => {
+    setGridSpacing(newValue);
+  };
+
+  // Toggle the grid visibility
+  const handleGridToggle = () => {
+    setShowGrid(!showGrid);
+  };
+
+  // Change the mode between view and edit
+  const handleModeChange = (event, newMode) => {
+    setMode(newMode);
+  };
 
   // Add a new token to the map
   const addToken = (url) => {
@@ -43,14 +68,85 @@ function MapViewer({ type, src }) {
     img.src = url;
     img.onload = () => {
       const newToken = {
+        id: Date.now(),
         image: img,
         name: "Token",
-        effect: [],
+        effects: [], // Initialize as an empty array
         position: { x: 0, y: 0 },
         size: gridSpacing,
       };
       setTokens((prevTokens) => [...prevTokens, newToken]);
     };
+  };
+
+  const handleTokenClick = (token) => {
+    setSelectedToken(token);
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = (e, token) => {
+    setIsDragging(false);
+    const updatedTokens = tokens.map((t) =>
+      t.id === token.id
+        ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
+        : t
+    );
+    setTokens(updatedTokens);
+  };
+
+  const removeToken = (id) => {
+    setTokens((prevTokens) => prevTokens.filter((token) => token.id !== id));
+    setSelectedToken(null);
+  };
+
+  const updateTokenName = (name) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id ? { ...token, name } : token
+      )
+    );
+  };
+
+  const addTokenEffect = (effect) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id
+          ? { ...token, effects: [...token.effects, effect] }
+          : token
+      )
+    );
+  };
+
+  // Toggle the fog of war visibility
+  const handleFogOfWarToggle = () => {
+    setShowFogOfWar(!showFogOfWar);
+  };
+
+  // Change the fog mode between spray and erase
+  const handleFogModeChange = (event, newFogMode) => {
+    setFogMode(newFogMode);
+  };
+
+  // Apply fog to the entire map
+  const applyFogToEntireMap = () => {
+    const fogCanvas = fogCanvasRef.current;
+    if (fogCanvas) {
+      const fogCtx = fogCanvas.getContext("2d");
+      fogCtx.clearRect(0, 0, dimensions.width, dimensions.height);
+      fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      fogCtx.fillRect(0, 0, dimensions.width, dimensions.height);
+      fogLayerRef.current.getLayer().batchDraw();
+    }
+  };
+
+  // Toggle the ruler tool
+  const handleRulerToggle = () => {
+    setRulerActive(!rulerActive);
+    setRulerStart(null);
+    setRulerEnd(null);
   };
 
   // Handle zooming with the mouse wheel
@@ -72,75 +168,6 @@ function MapViewer({ type, src }) {
       y: pointer.y - mousePointTo.y * newScale,
     };
     setTranslation(newPos);
-  };
-
-  // Load the main image and set dimensions
-  useEffect(() => {
-    if (type === "image" && image) {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        const maxWidth = window.innerWidth * 0.8;
-        const maxHeight = window.innerHeight * 0.9;
-        const scaleFactor = Math.min(maxWidth / img.width, maxHeight / img.height);
-
-        const scaledWidth = img.width * scaleFactor;
-        const scaledHeight = img.height * scaleFactor;
-
-        setDimensions({
-          width: scaledWidth,
-          height: scaledHeight,
-        });
-        setTranslation({
-          x: (window.innerWidth - scaledWidth) / 2,
-          y: (window.innerHeight - scaledHeight) / 2,
-        });
-      };
-    }
-  }, [type, src, image]);
-
-  // Apply fog to the entire map
-  const applyFogToEntireMap = () => {
-    const fogCanvas = fogCanvasRef.current;
-    if (fogCanvas) {
-      const fogCtx = fogCanvas.getContext("2d");
-      fogCtx.clearRect(0, 0, dimensions.width, dimensions.height);
-      fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      fogCtx.fillRect(0, 0, dimensions.width, dimensions.height);
-      fogLayerRef.current.getLayer().batchDraw();
-    }
-  };
-
-  // Handle changes to grid spacing
-  const handleGridSpacingChange = (event, newValue) => {
-    setGridSpacing(newValue);
-  };
-
-  // Toggle the grid visibility
-  const handleGridToggle = () => {
-    setShowGrid(!showGrid);
-  };
-
-  // Toggle the fog of war visibility
-  const handleFogOfWarToggle = () => {
-    setShowFogOfWar(!showFogOfWar);
-  };
-
-  // Change the mode between view and edit
-  const handleModeChange = (event, newMode) => {
-    setMode(newMode);
-  };
-
-  // Change the fog mode between spray and erase
-  const handleFogModeChange = (event, newFogMode) => {
-    setFogMode(newFogMode);
-  };
-
-  // Toggle the ruler tool
-  const handleRulerToggle = () => {
-    setRulerActive(!rulerActive);
-    setRulerStart(null);
-    setRulerEnd(null);
   };
 
   // Handle mouse down events on the stage
@@ -175,7 +202,7 @@ function MapViewer({ type, src }) {
       const stage = stageRef.current;
       stage.position({
         x: e.evt.clientX - startDragOffset.current.x,
-        y: e.evt.clientY - startDragOffset.current.y,
+        y: e.evt.clientY - startDragOffset.current.y(),
       });
       stage.batchDraw();
     } else if (rulerActive && rulerStart) {
@@ -194,14 +221,14 @@ function MapViewer({ type, src }) {
         const fogCtx = fogCanvas.getContext("2d");
         const x = (pointerPos.x - stage.x()) / stage.scaleX();
         const y = (pointerPos.y - stage.y()) / stage.scaleY();
-  
+
         if (fogMode === "spray") {
           fogCtx.globalCompositeOperation = "source-over";
           fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
         } else if (fogMode === "erase") {
           fogCtx.globalCompositeOperation = "destination-out";
         }
-  
+
         fogCtx.beginPath();
         fogCtx.arc(x, y, 20, 0, 2 * Math.PI);
         fogCtx.fill();
@@ -209,8 +236,6 @@ function MapViewer({ type, src }) {
       }
     }
   };
-  
-  
 
   // Handle mouse up events on the stage
   const handleStageMouseUp = () => {
@@ -221,6 +246,34 @@ function MapViewer({ type, src }) {
       setRulerEnd(null);
     }
   };
+
+  // Load the main image and set dimensions
+  useEffect(() => {
+    if (type === "image" && image) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        const maxWidth = window.innerWidth * 0.8;
+        const maxHeight = window.innerHeight * 0.9;
+        const scaleFactor = Math.min(
+          maxWidth / img.width,
+          maxHeight / img.height
+        );
+
+        const scaledWidth = img.width * scaleFactor;
+        const scaledHeight = img.height * scaleFactor;
+
+        setDimensions({
+          width: scaledWidth,
+          height: scaledHeight,
+        });
+        setTranslation({
+          x: (window.innerWidth - scaledWidth) / 2,
+          y: (window.innerHeight - scaledHeight) / 2,
+        });
+      };
+    }
+  }, [type, src, image]);
 
   // Change the cursor style based on fog mode and edit mode
   useEffect(() => {
@@ -471,22 +524,36 @@ function MapViewer({ type, src }) {
         </Layer>
         {showGrid && (
           <Layer>
-            {[...Array(Math.ceil(dimensions.width / gridSpacing)).keys()].map((i) => (
-              <Line
-                points={[i * gridSpacing, 0, i * gridSpacing, dimensions.height]}
-                stroke="rgba(255, 255, 255, 0.5)"
-                strokeWidth={1}
-                key={`v${i}`}
-              />
-            ))}
-            {[...Array(Math.ceil(dimensions.height / gridSpacing)).keys()].map((i) => (
-              <Line
-                points={[0, i * gridSpacing, dimensions.width, i * gridSpacing]}
-                stroke="rgba(255, 255, 255, 0.5)"
-                strokeWidth={1}
-                key={`h${i}`}
-              />
-            ))}
+            {[...Array(Math.ceil(dimensions.width / gridSpacing)).keys()].map(
+              (i) => (
+                <Line
+                  points={[
+                    i * gridSpacing,
+                    0,
+                    i * gridSpacing,
+                    dimensions.height,
+                  ]}
+                  stroke="rgba(255, 255, 255, 0.5)"
+                  strokeWidth={1}
+                  key={`v${i}`}
+                />
+              )
+            )}
+            {[...Array(Math.ceil(dimensions.height / gridSpacing)).keys()].map(
+              (i) => (
+                <Line
+                  points={[
+                    0,
+                    i * gridSpacing,
+                    dimensions.width,
+                    i * gridSpacing,
+                  ]}
+                  stroke="rgba(255, 255, 255, 0.5)"
+                  strokeWidth={1}
+                  key={`h${i}`}
+                />
+              )
+            )}
           </Layer>
         )}
         {showFogOfWar && (
@@ -499,24 +566,79 @@ function MapViewer({ type, src }) {
           </Layer>
         )}
         <Layer id="tokenLayer">
-          {tokens.map((token, index) => (
-            <KonvaImage
-              key={index}
-              image={token.image}
-              x={token.position.x}
-              y={token.position.y}
-              width={token.size}
-              height={token.size}
-              draggable
-              onDragEnd={(e) => {
-                const updatedTokens = tokens.map((t) =>
-                  t === token
-                    ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
-                    : t
-                );
-                setTokens(updatedTokens);
-              }}
-            />
+          {tokens.map((token) => (
+            <Group key={token.id}>
+              <KonvaImage
+                image={token.image}
+                x={token.position.x}
+                y={token.position.y}
+                width={token.size}
+                height={token.size}
+                draggable
+                onClick={() => handleTokenClick(token)}
+                onDragStart={handleDragStart}
+                onDragEnd={(e) => handleDragEnd(e, token)}
+              />
+              {selectedToken &&
+                selectedToken.id === token.id &&
+                !isDragging && (
+                  <>
+                    <Rect
+                      x={token.position.x + token.size}
+                      y={token.position.y}
+                      width={30}
+                      height={120}
+                      fill="white"
+                      opacity={0.7}
+                      cornerRadius={5}
+                    />
+                    <KonvaImage
+                      image={editIcon}
+                      x={token.position.x + token.size + 5}
+                      y={token.position.y}
+                      width={20}
+                      height={20}
+                      onClick={() => {
+                        const newName = prompt("Enter new name:", token.name);
+                        if (newName) {
+                          updateTokenName(newName);
+                        }
+                      }}
+                      zIndex={1}
+                    />
+                    <KonvaImage
+                      image={deleteIcon}
+                      x={token.position.x + token.size + 5}
+                      y={token.position.y + 25}
+                      width={20}
+                      height={20}
+                      onClick={() => {
+                        removeToken(token.id);
+                        setSelectedToken(null);
+                      }}
+                      zIndex={1}
+                    />
+                    <KonvaImage
+                      image={bloodiedIcon}
+                      x={token.position.x + token.size + 5}
+                      y={token.position.y + 50}
+                      width={20}
+                      height={20}
+                      onClick={() => addTokenEffect("bloodied")}
+                      zIndex={1}
+                    />
+                    <KonvaImage
+                      image={deadIcon}
+                      x={token.position.x + token.size + 5}
+                      y={token.position.y + 75}
+                      width={20}
+                      height={20}
+                      onClick={() => addTokenEffect("dead")}
+                      zIndex={1}
+                    />
+                  </>
+                )}
+            </Group>
           ))}
         </Layer>
         <Layer id="rulerLayer">
