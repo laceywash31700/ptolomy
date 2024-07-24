@@ -65,7 +65,6 @@ function MapViewer({ type, src }) {
   const [bloodiedIcon] = useImage(BloodiedIcon);
   const [deadIcon] = useImage(DeadIcon);
 
-
   // Handle changes to grid spacing
   const handleGridSpacingChange = (event, newValue) => {
     setGridSpacing(newValue);
@@ -80,11 +79,6 @@ function MapViewer({ type, src }) {
   const handleModeChange = (event, newMode) => {
     setMode(newMode);
   };
-
-
-
-  
-
 
   // Toggle the fog of war visibility
   const handleFogOfWarToggle = () => {
@@ -221,9 +215,7 @@ function MapViewer({ type, src }) {
     }
   };
 
-
-  
-// Add a new token to the map
+  // Add a new token to the map
   const addToken = (url) => {
     const img = new window.Image();
     img.src = url;
@@ -292,7 +284,7 @@ function MapViewer({ type, src }) {
     );
   };
 
- const handleEditTokenName = (e) => {
+  const handleEditTokenName = (e) => {
     setInputValue(e.target.value);
   };
 
@@ -306,7 +298,6 @@ function MapViewer({ type, src }) {
     setInputValue(value);
     setInputVisible(true);
   };
-
 
   useEffect(() => {
     if (selectedToken && transformerRef.current) {
@@ -368,7 +359,6 @@ function MapViewer({ type, src }) {
     }
   }, [type, src, image]);
 
- 
   const renderTokenUI = (token) => {
     return (
       selectedToken &&
@@ -721,6 +711,18 @@ function MapViewer({ type, src }) {
                   )
                 }
               />
+
+              {!isDragging && (
+                <Text
+                  text={token.name}
+                  x={token.position.x}
+                  y={token.position.y + token.size}
+                  fontSize={14}
+                  fill="white"
+                  align="center"
+                  width={token.size}
+                />
+              )}
               {renderTokenUI(token)}
             </Group>
           ))}
