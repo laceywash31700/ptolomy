@@ -11,7 +11,16 @@ import {
   ToggleButtonGroup,
   TextField,
 } from "@mui/material";
-import { Stage, Layer, Group, Rect, Image as KonvaImage, Line } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Group,
+  Rect,
+  Image as KonvaImage,
+  Line,
+  Text,
+  Transformer,
+} from "react-konva";
 import EditIcon from "/edit.png"; // Update with the correct path
 import DeleteIcon from "/bin.png"; // Update with the correct path
 import BloodiedIcon from "/blood.png"; // Update with the correct path
@@ -20,32 +29,42 @@ import useImage from "use-image";
 
 function MapViewer({ type, src }) {
   const stageRef = useRef(null); // Reference to the Konva Stage
-  const startDragOffset = useRef({ x: 0, y: 0 });
-  const draggingStage = useRef(false);
-  const fogLayerRef = useRef(null); // Reference to the fog layer
-  const fogCanvasRef = useRef(null); // Reference to the fog canvas
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [scale, setScale] = useState(1.1);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [translation, setTranslation] = useState({ x: 0, y: 0 });
+
   const [gridSpacing, setGridSpacing] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
-  const [showFogOfWar, setShowFogOfWar] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [showGridSettings, setShowGridSettings] = useState(false);
-  const [spraying, setSpraying] = useState(false);
   const [mode, setMode] = useState("view");
+
+  const fogLayerRef = useRef(null); // Reference to the fog layer
+  const fogCanvasRef = useRef(null); // Reference to the fog canvas
   const [fogMode, setFogMode] = useState("spray");
+  const [showFogOfWar, setShowFogOfWar] = useState(false);
+  const [spraying, setSpraying] = useState(false);
+
   const [unitDistance, setUnitDistance] = useState(5);
   const [rulerActive, setRulerActive] = useState(false);
   const [rulerStart, setRulerStart] = useState(null);
   const [rulerEnd, setRulerEnd] = useState(null);
+
+  const draggingStage = useRef(false);
+  const transformerRef = useRef(null);
+  const startDragOffset = useRef({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
   const [tokens, setTokens] = useState([]);
+  const [inputVisible, setInputVisible] = useState(false);
+  const [inputPosition, setInputPosition] = useState({ x: 0, y: 0 });
+  const [inputValue, setInputValue] = useState("");
+
   const [image] = useImage(src); // Load main image using useImage hook
   const [editIcon] = useImage(EditIcon);
   const [deleteIcon] = useImage(DeleteIcon);
   const [bloodiedIcon] = useImage(BloodiedIcon);
   const [deadIcon] = useImage(DeadIcon);
+
 
   // Handle changes to grid spacing
   const handleGridSpacingChange = (event, newValue) => {
@@ -62,63 +81,10 @@ function MapViewer({ type, src }) {
     setMode(newMode);
   };
 
-  // Add a new token to the map
-  const addToken = (url) => {
-    const img = new window.Image();
-    img.src = url;
-    img.onload = () => {
-      const newToken = {
-        id: Date.now(),
-        image: img,
-        name: "Token",
-        effects: [], // Initialize as an empty array
-        position: { x: 0, y: 0 },
-        size: gridSpacing,
-      };
-      setTokens((prevTokens) => [...prevTokens, newToken]);
-    };
-  };
 
-  const handleTokenClick = (token) => {
-    setSelectedToken(token);
-  };
 
-  const handleDragStart = () => {
-    setIsDragging(true);
-  };
+  
 
-  const handleDragEnd = (e, token) => {
-    setIsDragging(false);
-    const updatedTokens = tokens.map((t) =>
-      t.id === token.id
-        ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
-        : t
-    );
-    setTokens(updatedTokens);
-  };
-
-  const removeToken = (id) => {
-    setTokens((prevTokens) => prevTokens.filter((token) => token.id !== id));
-    setSelectedToken(null);
-  };
-
-  const updateTokenName = (name) => {
-    setTokens((prevTokens) =>
-      prevTokens.map((token) =>
-        token.id === selectedToken.id ? { ...token, name } : token
-      )
-    );
-  };
-
-  const addTokenEffect = (effect) => {
-    setTokens((prevTokens) =>
-      prevTokens.map((token) =>
-        token.id === selectedToken.id
-          ? { ...token, effects: [...token.effects, effect] }
-          : token
-      )
-    );
-  };
 
   // Toggle the fog of war visibility
   const handleFogOfWarToggle = () => {
@@ -147,6 +113,14 @@ function MapViewer({ type, src }) {
     setRulerActive(!rulerActive);
     setRulerStart(null);
     setRulerEnd(null);
+  };
+
+  const calculateDistance = (start, end) => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distanceInPixels = Math.sqrt(dx * dx + dy * dy);
+    const squares = Math.floor(distanceInPixels / gridSpacing);
+    return squares * unitDistance;
   };
 
   // Handle zooming with the mouse wheel
@@ -202,7 +176,7 @@ function MapViewer({ type, src }) {
       const stage = stageRef.current;
       stage.position({
         x: e.evt.clientX - startDragOffset.current.x,
-        y: e.evt.clientY - startDragOffset.current.y(),
+        y: e.evt.clientY - startDragOffset.current.y,
       });
       stage.batchDraw();
     } else if (rulerActive && rulerStart) {
@@ -247,6 +221,125 @@ function MapViewer({ type, src }) {
     }
   };
 
+
+  
+// Add a new token to the map
+  const addToken = (url) => {
+    const img = new window.Image();
+    img.src = url;
+    img.onload = () => {
+      const newToken = {
+        id: Date.now(),
+        image: img,
+        name: "Token",
+        effects: [], // Initialize as an empty array
+        position: { x: 0, y: 0 },
+        size: gridSpacing,
+      };
+      setTokens((prevTokens) => [...prevTokens, newToken]);
+    };
+  };
+
+  const handleTokenClick = (token) => {
+    if (selectedToken && selectedToken.id === token.id) {
+      setSelectedToken(null);
+    } else {
+      setSelectedToken(token);
+    }
+  };
+
+  const handleStageClick = (e) => {
+    if (e.target === stageRef.current) {
+      setSelectedToken(null);
+      setInputVisible(false);
+    }
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = (e, token) => {
+    setIsDragging(false);
+    const updatedTokens = tokens.map((t) =>
+      t.id === token.id
+        ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
+        : t
+    );
+    setTokens(updatedTokens);
+  };
+
+  const removeToken = (id) => {
+    setTokens((prevTokens) => prevTokens.filter((token) => token.id !== id));
+    setSelectedToken(null);
+  };
+
+  const updateTokenName = (name) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id ? { ...token, name } : token
+      )
+    );
+  };
+
+  const addTokenEffect = (effect) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id
+          ? { ...token, effects: [...token.effects, effect] }
+          : token
+      )
+    );
+  };
+
+ const handleEditTokenName = (e) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    updateTokenName(inputValue);
+    setInputVisible(false);
+  };
+
+  const showInputField = (x, y, value) => {
+    setInputPosition({ x, y });
+    setInputValue(value);
+    setInputVisible(true);
+  };
+
+
+  useEffect(() => {
+    if (selectedToken && transformerRef.current) {
+      transformerRef.current.nodes([
+        stageRef.current.findOne(`#${selectedToken.id}`),
+      ]);
+      transformerRef.current.getLayer().batchDraw();
+    }
+  }, [selectedToken]);
+
+  // Change the cursor style based on fog mode and edit mode
+  useEffect(() => {
+    if (stageRef.current) {
+      if (mode === "edit" && showFogOfWar) {
+        switch (fogMode) {
+          case "spray":
+            stageRef.current.container().style.cursor =
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='purple' stroke-width='2'/></svg>\"), auto";
+            break;
+          case "erase":
+            stageRef.current.container().style.cursor =
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='red' stroke-width='2'/></svg>\"), auto";
+            break;
+          default:
+            stageRef.current.container().style.cursor = "auto";
+            break;
+        }
+      } else {
+        stageRef.current.container().style.cursor = "auto";
+      }
+    }
+  }, [mode, fogMode, showFogOfWar]);
+
   // Load the main image and set dimensions
   useEffect(() => {
     if (type === "image" && image) {
@@ -275,28 +368,71 @@ function MapViewer({ type, src }) {
     }
   }, [type, src, image]);
 
-  // Change the cursor style based on fog mode and edit mode
-  useEffect(() => {
-    if (stageRef.current) {
-      if (mode === "edit" && showFogOfWar) {
-        switch (fogMode) {
-          case "spray":
-            stageRef.current.container().style.cursor =
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='purple' stroke-width='2'/></svg>\"), auto";
-            break;
-          case "erase":
-            stageRef.current.container().style.cursor =
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='red' stroke-width='2'/></svg>\"), auto";
-            break;
-          default:
-            stageRef.current.container().style.cursor = "auto";
-            break;
-        }
-      } else {
-        stageRef.current.container().style.cursor = "auto";
-      }
-    }
-  }, [mode, fogMode, showFogOfWar]);
+ 
+  const renderTokenUI = (token) => {
+    return (
+      selectedToken &&
+      selectedToken.id === token.id &&
+      !isDragging && (
+        <>
+          <Rect
+            x={token.position.x + token.size}
+            y={token.position.y}
+            width={30}
+            height={120}
+            fill="grey"
+            opacity={0.8}
+            cornerRadius={5}
+          />
+          <KonvaImage
+            image={editIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y}
+            width={20}
+            height={20}
+            onClick={() => {
+              showInputField(
+                token.position.x,
+                token.position.y + token.size + 5,
+                token.name
+              );
+            }}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={deleteIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 25}
+            width={20}
+            height={20}
+            onClick={() => {
+              removeToken(token.id);
+              setSelectedToken(null);
+            }}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={bloodiedIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 50}
+            width={20}
+            height={20}
+            onClick={() => addTokenEffect("bloodied")}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={deadIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 75}
+            width={20}
+            height={20}
+            onClick={() => addTokenEffect("dead")}
+            zIndex={1}
+          />
+        </>
+      )
+    );
+  };
 
   return (
     <Box
@@ -384,43 +520,6 @@ function MapViewer({ type, src }) {
           </Button>
         )}
 
-        <FormControlLabel
-          control={
-            <Checkbox checked={rulerActive} onChange={handleRulerToggle} />
-          }
-          label="Ruler Tool"
-          sx={{ mt: 2 }}
-        />
-
-        {(showFogOfWar || rulerActive) && (
-          <ToggleButtonGroup
-            color="primary"
-            value={mode}
-            exclusive
-            onChange={handleModeChange}
-            sx={{
-              mt: 2,
-              "& .MuiToggleButton-root": {
-                color: "white",
-                "&.Mui-selected": {
-                  color: "cyan",
-                  backgroundColor: "rgba(0, 123, 255, 0.1)",
-                },
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                },
-              },
-            }}
-          >
-            <ToggleButton value="view" sx={{ color: "inherit" }}>
-              View
-            </ToggleButton>
-            <ToggleButton value="edit" sx={{ color: "inherit" }}>
-              Edit
-            </ToggleButton>
-          </ToggleButtonGroup>
-        )}
-
         {showFogOfWar && mode === "edit" && (
           <ToggleButtonGroup
             value={fogMode}
@@ -448,6 +547,41 @@ function MapViewer({ type, src }) {
             </ToggleButton>
           </ToggleButtonGroup>
         )}
+
+        <FormControlLabel
+          control={
+            <Checkbox checked={rulerActive} onChange={handleRulerToggle} />
+          }
+          label="Ruler Tool"
+          sx={{ mt: 2 }}
+        />
+
+        <ToggleButtonGroup
+          color="primary"
+          value={mode}
+          exclusive
+          onChange={handleModeChange}
+          sx={{
+            mt: 2,
+            "& .MuiToggleButton-root": {
+              color: "white",
+              "&.Mui-selected": {
+                color: "cyan",
+                backgroundColor: "rgba(0, 123, 255, 0.1)",
+              },
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+              },
+            },
+          }}
+        >
+          <ToggleButton value="view" sx={{ color: "inherit" }}>
+            View
+          </ToggleButton>
+          <ToggleButton value="edit" sx={{ color: "inherit" }}>
+            Edit
+          </ToggleButton>
+        </ToggleButtonGroup>
 
         {rulerActive && (
           <TextField
@@ -503,6 +637,7 @@ function MapViewer({ type, src }) {
         onMouseUp={handleStageMouseUp}
         ref={stageRef}
         draggable={mode === "view"}
+        onClick={handleStageClick}
       >
         <Layer>
           {type === "image" && image && (
@@ -578,76 +713,33 @@ function MapViewer({ type, src }) {
                 onClick={() => handleTokenClick(token)}
                 onDragStart={handleDragStart}
                 onDragEnd={(e) => handleDragEnd(e, token)}
+                onDblClick={() =>
+                  showInputField(
+                    token.position.x,
+                    token.position.y + token.size + 5,
+                    token.name
+                  )
+                }
               />
-              {selectedToken &&
-                selectedToken.id === token.id &&
-                !isDragging && (
-                  <>
-                    <Rect
-                      x={token.position.x + token.size}
-                      y={token.position.y}
-                      width={30}
-                      height={120}
-                      fill="white"
-                      opacity={0.7}
-                      cornerRadius={5}
-                    />
-                    <KonvaImage
-                      image={editIcon}
-                      x={token.position.x + token.size + 5}
-                      y={token.position.y}
-                      width={20}
-                      height={20}
-                      onClick={() => {
-                        const newName = prompt("Enter new name:", token.name);
-                        if (newName) {
-                          updateTokenName(newName);
-                        }
-                      }}
-                      zIndex={1}
-                    />
-                    <KonvaImage
-                      image={deleteIcon}
-                      x={token.position.x + token.size + 5}
-                      y={token.position.y + 25}
-                      width={20}
-                      height={20}
-                      onClick={() => {
-                        removeToken(token.id);
-                        setSelectedToken(null);
-                      }}
-                      zIndex={1}
-                    />
-                    <KonvaImage
-                      image={bloodiedIcon}
-                      x={token.position.x + token.size + 5}
-                      y={token.position.y + 50}
-                      width={20}
-                      height={20}
-                      onClick={() => addTokenEffect("bloodied")}
-                      zIndex={1}
-                    />
-                    <KonvaImage
-                      image={deadIcon}
-                      x={token.position.x + token.size + 5}
-                      y={token.position.y + 75}
-                      width={20}
-                      height={20}
-                      onClick={() => addTokenEffect("dead")}
-                      zIndex={1}
-                    />
-                  </>
-                )}
+              {renderTokenUI(token)}
             </Group>
           ))}
         </Layer>
         <Layer id="rulerLayer">
           {rulerStart && rulerEnd && (
-            <Line
-              points={[rulerStart.x, rulerStart.y, rulerEnd.x, rulerEnd.y]}
-              stroke="red"
-              strokeWidth={2}
-            />
+            <>
+              <Line
+                points={[rulerStart.x, rulerStart.y, rulerEnd.x, rulerEnd.y]}
+                stroke="red"
+                strokeWidth={2}
+              />
+              <Text
+                text={`${calculateDistance(rulerStart, rulerEnd)} ft`}
+                x={(rulerStart.x + rulerEnd.x) / 2}
+                y={(rulerStart.y + rulerEnd.y) / 2}
+                fill="white"
+              />
+            </>
           )}
         </Layer>
       </Stage>
@@ -659,6 +751,22 @@ function MapViewer({ type, src }) {
         height={dimensions.height}
         style={{ display: "none" }}
       />
+
+      {/* Input field for editing token name */}
+      {inputVisible && (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleEditTokenName}
+          onBlur={handleInputBlur}
+          style={{
+            position: "absolute",
+            top: inputPosition.y,
+            left: inputPosition.x,
+            zIndex: 25,
+          }}
+        />
+      )}
     </Box>
   );
 }
