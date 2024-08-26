@@ -1,5 +1,5 @@
+import { Message } from '@mui/icons-material';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import io from 'socket.io-client';
 
 const SocketContext = createContext();
 
@@ -7,11 +7,20 @@ export const useSocket = () => {
   return useContext(SocketContext);
 };
 
-export const SocketProvider = ({ children }) => {
+export const GameState = ({ children }) => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const newSocket = io('http://localhost:3000');
+    console.log('code is running');
+    const newSocket = new WebSocket('ws://localhost:8080');
+    newSocket.onmessage = (message) => {
+      console.log('WebSocket message received:', message);
+      // handle the message if needed
+    };
+  
+    newSocket.onopen = function () {
+      console.log('you are connected');
+    };
     setSocket(newSocket);
 
     return () => newSocket.close();

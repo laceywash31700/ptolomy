@@ -300,6 +300,7 @@ function MapViewer({ type, src }) {
   };
 
   useEffect(() => {
+    // console.log(tokens[0].position);
     if (selectedToken && transformerRef.current) {
       transformerRef.current.nodes([
         stageRef.current.findOne(`#${selectedToken.id}`),
