@@ -11,153 +11,330 @@ import {
   ToggleButtonGroup,
   TextField,
 } from "@mui/material";
-import { MapInteractionCSS } from "react-map-interaction";
+import {
+  Stage,
+  Layer,
+  Group,
+  Rect,
+  Image as KonvaImage,
+  Line,
+  Text,
+  Transformer,
+} from "react-konva";
+import EditIcon from "/edit.png"; // Update with the correct path
+import DeleteIcon from "/bin.png"; // Update with the correct path
+import BloodiedIcon from "/blood.png"; // Update with the correct path
+import DeadIcon from "/skull.png"; // Update with the correct path
+import useImage from "use-image";
 
 function MapViewer({ type, src }) {
-  const canvasRef = useRef(null); // Main canvas reference
-  const fogCanvasRef = useRef(null); // Fog of war canvas reference
-  const gridCanvasRef = useRef(null); // Grid canvas reference
-  const [dimensions, setDimensions] = useState({
-    width: 0,
-    height: 0,
-    x: 0,
-    y: 0,
-  }); // State for storing canvas dimensions
-  const [scale, setScale] = useState(1.1); // State for scaling the canvas
-  const [translation, setTranslation] = useState({ x: 0, y: 0 }); // State for canvas translation
-  const [gridSpacing, setGridSpacing] = useState(50); // State for grid spacing
-  const [showGrid, setShowGrid] = useState(false); // State to show/hide grid
-  const [showFogOfWar, setShowFogOfWar] = useState(false); // State to show/hide fog of war
-  const [showGridSettings, setShowGridSettings] = useState(false); // State to show/hide grid settings slider
-  const [spraying, setSpraying] = useState(false); // State to track if fog of war is being sprayed
-  const [mode, setMode] = useState("view"); // State to track mode (view or edit)
-  const [fogMode, setFogMode] = useState("spray"); // State to track fog mode (spray or erase)
-  const [unitDistance, setUnitDistance] = useState(5); // State to set the unit distance for ruler
-  const [rulerActive, setRulerActive] = useState(false); // State to track if ruler is active
-  const [rulerStart, setRulerStart] = useState(null); // State to store start point of ruler
-  const [rulerEnd, setRulerEnd] = useState(null); // State to store end point of ruler
+  const stageRef = useRef(null); // Reference to the Konva Stage
+  const [scale, setScale] = useState(1.1);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [translation, setTranslation] = useState({ x: 0, y: 0 });
 
-  // Toggles the ruler tool
+  const [gridSpacing, setGridSpacing] = useState(50);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showGridSettings, setShowGridSettings] = useState(false);
+  const [mode, setMode] = useState("view");
+
+  const fogLayerRef = useRef(null); // Reference to the fog layer
+  const fogCanvasRef = useRef(null); // Reference to the fog canvas
+  const [fogMode, setFogMode] = useState("spray");
+  const [showFogOfWar, setShowFogOfWar] = useState(false);
+  const [spraying, setSpraying] = useState(false);
+
+  const [unitDistance, setUnitDistance] = useState(5);
+  const [rulerActive, setRulerActive] = useState(false);
+  const [rulerStart, setRulerStart] = useState(null);
+  const [rulerEnd, setRulerEnd] = useState(null);
+
+  const draggingStage = useRef(false);
+  const transformerRef = useRef(null);
+  const startDragOffset = useRef({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [selectedToken, setSelectedToken] = useState(null);
+  const [tokens, setTokens] = useState([]);
+  const [inputVisible, setInputVisible] = useState(false);
+  const [inputPosition, setInputPosition] = useState({ x: 0, y: 0 });
+  const [inputValue, setInputValue] = useState("");
+
+  const [image] = useImage(src); // Load main image using useImage hook
+  const [editIcon] = useImage(EditIcon);
+  const [deleteIcon] = useImage(DeleteIcon);
+  const [bloodiedIcon] = useImage(BloodiedIcon);
+  const [deadIcon] = useImage(DeadIcon);
+
+  // Handle changes to grid spacing
+  const handleGridSpacingChange = (event, newValue) => {
+    setGridSpacing(newValue);
+  };
+
+  // Toggle the grid visibility
+  const handleGridToggle = () => {
+    setShowGrid(!showGrid);
+  };
+
+  // Change the mode between view and edit
+  const handleModeChange = (event, newMode) => {
+    setMode(newMode);
+  };
+
+  // Toggle the fog of war visibility
+  const handleFogOfWarToggle = () => {
+    setShowFogOfWar(!showFogOfWar);
+  };
+
+  // Change the fog mode between spray and erase
+  const handleFogModeChange = (event, newFogMode) => {
+    setFogMode(newFogMode);
+  };
+
+  // Apply fog to the entire map
+  const applyFogToEntireMap = () => {
+    const fogCanvas = fogCanvasRef.current;
+    if (fogCanvas) {
+      const fogCtx = fogCanvas.getContext("2d");
+      fogCtx.clearRect(0, 0, dimensions.width, dimensions.height);
+      fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      fogCtx.fillRect(0, 0, dimensions.width, dimensions.height);
+      fogLayerRef.current.getLayer().batchDraw();
+    }
+  };
+
+  // Toggle the ruler tool
   const handleRulerToggle = () => {
     setRulerActive(!rulerActive);
     setRulerStart(null);
     setRulerEnd(null);
   };
 
-  // Handles mouse down event for fog of war and ruler tool
-  const handleMouseDown = (event) => {
-    if (mode === "edit" && showFogOfWar) {
-      setSpraying(true);
-    } else if (rulerActive && fogCanvasRef.current) {
-      const rect = fogCanvasRef.current.getBoundingClientRect();
-      setRulerStart({
-        x: (event.clientX - rect.left) / scale,
-        y: (event.clientY - rect.top) / scale,
-      });
+  const calculateDistance = (start, end) => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distanceInPixels = Math.sqrt(dx * dx + dy * dy);
+    const squares = Math.floor(distanceInPixels / gridSpacing);
+    return squares * unitDistance;
+  };
+
+  // Handle zooming with the mouse wheel
+  const handleWheel = (e) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const newScale = e.evt.deltaY > 0 ? oldScale * 1.1 : oldScale / 1.1;
+    setScale(newScale);
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    setTranslation(newPos);
+  };
+
+  // Handle mouse down events on the stage
+  const handleStageMouseDown = (e) => {
+    if (mode === "view") {
+      const isElement = e.target.className === "Image";
+      if (isElement) {
+        return;
+      }
+      draggingStage.current = true;
+      startDragOffset.current = {
+        x: e.evt.clientX - stageRef.current.x(),
+        y: e.evt.clientY - stageRef.current.y(),
+      };
+    } else if (rulerActive) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const adjustedPointerPos = {
+        x: (pointerPos.x - stage.x()) / stage.scaleX(),
+        y: (pointerPos.y - stage.y()) / stage.scaleY(),
+      };
+      setRulerStart(adjustedPointerPos);
       setRulerEnd(null);
+    } else if (mode === "edit" && showFogOfWar) {
+      setSpraying(true);
     }
   };
 
-  // Handles mouse move event for fog of war and ruler tool
-  const handleMouseMove = (event) => {
-    if (spraying && showFogOfWar) {
-      const fogCanvas = fogCanvasRef.current;
-      const fogCtx = fogCanvas.getContext("2d");
-      const rect = fogCanvas.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / scale;
-      const y = (event.clientY - rect.top) / scale;
-
-      fogCtx.globalCompositeOperation =
-        fogMode === "erase" ? "destination-out" : "source-over";
-
-      fogCtx.beginPath();
-      fogCtx.arc(x, y, 20, 0, 2 * Math.PI);
-      fogCtx.fill();
-    } else if (rulerActive && rulerStart && fogCanvasRef.current) {
-      const rect = fogCanvasRef.current.getBoundingClientRect();
-      setRulerEnd({
-        x: (event.clientX - rect.left) / scale,
-        y: (event.clientY - rect.top) / scale,
+  // Handle mouse move events on the stage
+  const handleStageMouseMove = (e) => {
+    if (draggingStage.current) {
+      const stage = stageRef.current;
+      stage.position({
+        x: e.evt.clientX - startDragOffset.current.x,
+        y: e.evt.clientY - startDragOffset.current.y,
       });
-      drawTemporaryLine();
+      stage.batchDraw();
+    } else if (rulerActive && rulerStart) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const adjustedPointerPos = {
+        x: (pointerPos.x - stage.x()) / stage.scaleX(),
+        y: (pointerPos.y - stage.y()) / stage.scaleY(),
+      };
+      setRulerEnd(adjustedPointerPos);
+    } else if (spraying) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const fogCanvas = fogCanvasRef.current;
+      if (fogCanvas) {
+        const fogCtx = fogCanvas.getContext("2d");
+        const x = (pointerPos.x - stage.x()) / stage.scaleX();
+        const y = (pointerPos.y - stage.y()) / stage.scaleY();
+
+        if (fogMode === "spray") {
+          fogCtx.globalCompositeOperation = "source-over";
+          fogCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        } else if (fogMode === "erase") {
+          fogCtx.globalCompositeOperation = "destination-out";
+        }
+
+        fogCtx.beginPath();
+        fogCtx.arc(x, y, 20, 0, 2 * Math.PI);
+        fogCtx.fill();
+        fogLayerRef.current.getLayer().batchDraw();
+      }
     }
   };
 
-  // Handles mouse up event to stop spraying and clear the ruler line
-  const handleMouseUp = () => {
+  // Handle mouse up events on the stage
+  const handleStageMouseUp = () => {
+    draggingStage.current = false;
     setSpraying(false);
     if (rulerActive && rulerStart) {
-      if (fogCanvasRef.current) {
-        const ctx = fogCanvasRef.current.getContext("2d");
-        ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      }
       setRulerStart(null);
       setRulerEnd(null);
     }
   };
 
-  // Draws the temporary ruler line and calculates the distance
-  const drawTemporaryLine = () => {
-    if (rulerStart && rulerEnd && fogCanvasRef.current) {
-      const ctx = fogCanvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
-      ctx.beginPath();
-      ctx.moveTo(rulerStart.x, rulerStart.y);
-      ctx.lineTo(rulerEnd.x, rulerEnd.y);
-      ctx.strokeStyle = "red";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+  // Add a new token to the map
+  const addToken = (url) => {
+    const img = new window.Image();
+    img.src = url;
+    img.onload = () => {
+      const newToken = {
+        id: Date.now(),
+        image: img,
+        name: "Token",
+        effects: [], // Initialize as an empty array
+        position: { x: 0, y: 0 },
+        size: gridSpacing,
+      };
+      setTokens((prevTokens) => [...prevTokens, newToken]);
+    };
+  };
 
-      // Calculate distance
-      const dx = rulerEnd.x - rulerStart.x;
-      const dy = rulerEnd.y - rulerStart.y;
-      const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-      const gridDistance = pixelDistance / gridSpacing;
-      const distance = Math.round(gridDistance) * unitDistance;
-
-      // Display distance
-      ctx.font = "16px Arial";
-      ctx.fillStyle = "white";
-      ctx.fillText(`${distance} ft`, (rulerStart.x + rulerEnd.x) / 2, (rulerStart.y + rulerEnd.y) / 2);
+  const handleTokenClick = (token) => {
+    if (selectedToken && selectedToken.id === token.id) {
+      setSelectedToken(null);
+    } else {
+      setSelectedToken(token);
     }
   };
 
-  // Effect to update cursor style based on fog mode and edit mode
+  const handleStageClick = (e) => {
+    if (e.target === stageRef.current) {
+      setSelectedToken(null);
+      setInputVisible(false);
+    }
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = (e, token) => {
+    setIsDragging(false);
+    const updatedTokens = tokens.map((t) =>
+      t.id === token.id
+        ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
+        : t
+    );
+    setTokens(updatedTokens);
+  };
+
+  const removeToken = (id) => {
+    setTokens((prevTokens) => prevTokens.filter((token) => token.id !== id));
+    setSelectedToken(null);
+  };
+
+  const updateTokenName = (name) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id ? { ...token, name } : token
+      )
+    );
+  };
+
+  const addTokenEffect = (effect) => {
+    setTokens((prevTokens) =>
+      prevTokens.map((token) =>
+        token.id === selectedToken.id
+          ? { ...token, effects: [...token.effects, effect] }
+          : token
+      )
+    );
+  };
+
+  const handleEditTokenName = (e) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    updateTokenName(inputValue);
+    setInputVisible(false);
+  };
+
+  const showInputField = (x, y, value) => {
+    setInputPosition({ x, y });
+    setInputValue(value);
+    setInputVisible(true);
+  };
+
   useEffect(() => {
-    if (fogCanvasRef.current) {
+    // console.log(tokens[0].position);
+    if (selectedToken && transformerRef.current) {
+      transformerRef.current.nodes([
+        stageRef.current.findOne(`#${selectedToken.id}`),
+      ]);
+      transformerRef.current.getLayer().batchDraw();
+    }
+  }, [selectedToken]);
+
+  // Change the cursor style based on fog mode and edit mode
+  useEffect(() => {
+    if (stageRef.current) {
       if (mode === "edit" && showFogOfWar) {
         switch (fogMode) {
           case "spray":
-            fogCanvasRef.current.style.cursor =
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='white' stroke-width='2'/></svg>\"), auto";
+            stageRef.current.container().style.cursor =
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='purple' stroke-width='2'/></svg>\"), auto";
             break;
           case "erase":
-            fogCanvasRef.current.style.cursor =
+            stageRef.current.container().style.cursor =
               "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewport='0 0 40 40' fill='none'><circle cx='20' cy='20' r='19' stroke='red' stroke-width='2'/></svg>\"), auto";
             break;
           default:
-            fogCanvasRef.current.style.cursor = "auto";
+            stageRef.current.container().style.cursor = "auto";
             break;
         }
       } else {
-        fogCanvasRef.current.style.cursor = "auto";
+        stageRef.current.container().style.cursor = "auto";
       }
     }
   }, [mode, fogMode, showFogOfWar]);
 
-  // Effect to load the image and initialize canvas dimensions and grid
+  // Load the main image and set dimensions
   useEffect(() => {
-    if (
-      type === "image" &&
-      canvasRef.current &&
-      fogCanvasRef.current &&
-      gridCanvasRef.current
-    ) {
-      const canvas = canvasRef.current;
-      const fogCanvas = fogCanvasRef.current;
-      const gridCanvas = gridCanvasRef.current;
-      const ctx = canvas.getContext("2d");
-      const gridCtx = gridCanvas.getContext("2d");
+    if (type === "image" && image) {
       const img = new Image();
       img.src = src;
       img.onload = () => {
@@ -174,84 +351,78 @@ function MapViewer({ type, src }) {
         setDimensions({
           width: scaledWidth,
           height: scaledHeight,
-          x: (window.innerWidth - scaledWidth) / 2,
-          y: (window.innerHeight - scaledHeight) / 2,
         });
         setTranslation({
           x: (window.innerWidth - scaledWidth) / 2,
           y: (window.innerHeight - scaledHeight) / 2,
         });
-
-        canvas.width = scaledWidth;
-        canvas.height = scaledHeight;
-        fogCanvas.width = scaledWidth;
-        fogCanvas.height = scaledHeight;
-        gridCanvas.width = scaledWidth;
-        gridCanvas.height = scaledHeight;
-
-        ctx.clearRect(0, 0, scaledWidth, scaledHeight);
-        ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-
-        updateGrid(gridCtx, scaledWidth, scaledHeight, gridSpacing);
       };
     }
-  }, [type, src, showGrid, showFogOfWar, gridSpacing]);
+  }, [type, src, image]);
 
-  // Draws the grid lines on the canvas
-  const drawGrid = (ctx, width, height, spacing) => {
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-    ctx.lineWidth = 1;
-    for (let x = spacing; x < width; x += spacing) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-    }
-    for (let y = spacing; y < height; y += spacing) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-    }
-    ctx.stroke();
-  };
-
-  // Handles changes to grid spacing and updates the grid
-  const handleGridSpacingChange = (event, newValue) => {
-    setGridSpacing(newValue);
-    if (gridCanvasRef.current) {
-      updateGrid(
-        gridCanvasRef.current.getContext("2d"),
-        dimensions.width,
-        dimensions.height,
-        newValue
-      );
-    }
-  };
-
-  // Updates the grid lines on the canvas
-  const updateGrid = (ctx, width, height, spacing) => {
-    ctx.clearRect(0, 0, width, height);
-    if (showGrid) {
-      drawGrid(ctx, width, height, spacing);
-    }
-  };
-
-  // Toggles the grid visibility
-  const handleGridToggle = () => {
-    setShowGrid(!showGrid);
-  };
-
-  // Toggles the fog of war visibility
-  const handleFogOfWarToggle = () => {
-    setShowFogOfWar(!showFogOfWar);
-  };
-
-  // Handles mode changes between view and edit
-  const handleModeChange = (event, newMode) => {
-    setMode(newMode);
-  };
-
-  // Handles fog mode changes between spray and erase
-  const handleFogModeChange = (event, newFogMode) => {
-    setFogMode(newFogMode);
+  const renderTokenUI = (token) => {
+    return (
+      selectedToken &&
+      selectedToken.id === token.id &&
+      !isDragging && (
+        <>
+          <Rect
+            x={token.position.x + token.size}
+            y={token.position.y}
+            width={30}
+            height={120}
+            fill="grey"
+            opacity={0.8}
+            cornerRadius={5}
+          />
+          <KonvaImage
+            image={editIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y}
+            width={20}
+            height={20}
+            onClick={() => {
+              showInputField(
+                token.position.x,
+                token.position.y + token.size + 5,
+                token.name
+              );
+            }}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={deleteIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 25}
+            width={20}
+            height={20}
+            onClick={() => {
+              removeToken(token.id);
+              setSelectedToken(null);
+            }}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={bloodiedIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 50}
+            width={20}
+            height={20}
+            onClick={() => addTokenEffect("bloodied")}
+            zIndex={1}
+          />
+          <KonvaImage
+            image={deadIcon}
+            x={token.position.x + token.size + 5}
+            y={token.position.y + 75}
+            width={20}
+            height={20}
+            onClick={() => addTokenEffect("dead")}
+            zIndex={1}
+          />
+        </>
+      )
+    );
   };
 
   return (
@@ -329,41 +500,15 @@ function MapViewer({ type, src }) {
           sx={{ mt: 2 }}
         />
 
-        <FormControlLabel
-          control={
-            <Checkbox checked={rulerActive} onChange={handleRulerToggle} />
-          }
-          label="Ruler Tool"
-          sx={{ mt: 2 }}
-        />
-
-        {(showFogOfWar || rulerActive) && (
-          <ToggleButtonGroup
-            color="primary"
-            value={mode}
-            exclusive
-            onChange={handleModeChange}
-            sx={{
-              mt: 2,
-              "& .MuiToggleButton-root": {
-                color: "white",
-                "&.Mui-selected": {
-                  color: "cyan",
-                  backgroundColor: "rgba(0, 123, 255, 0.1)",
-                },
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                },
-              },
-            }}
+        {showFogOfWar && (
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={applyFogToEntireMap}
+            sx={{ mt: 2 }}
           >
-            <ToggleButton value="view" sx={{ color: "inherit" }}>
-              View
-            </ToggleButton>
-            <ToggleButton value="edit" sx={{ color: "inherit" }}>
-              Edit
-            </ToggleButton>
-          </ToggleButtonGroup>
+            Apply Fog to Entire Map
+          </Button>
         )}
 
         {showFogOfWar && mode === "edit" && (
@@ -394,6 +539,41 @@ function MapViewer({ type, src }) {
           </ToggleButtonGroup>
         )}
 
+        <FormControlLabel
+          control={
+            <Checkbox checked={rulerActive} onChange={handleRulerToggle} />
+          }
+          label="Ruler Tool"
+          sx={{ mt: 2 }}
+        />
+
+        <ToggleButtonGroup
+          color="primary"
+          value={mode}
+          exclusive
+          onChange={handleModeChange}
+          sx={{
+            mt: 2,
+            "& .MuiToggleButton-root": {
+              color: "white",
+              "&.Mui-selected": {
+                color: "cyan",
+                backgroundColor: "rgba(0, 123, 255, 0.1)",
+              },
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+              },
+            },
+          }}
+        >
+          <ToggleButton value="view" sx={{ color: "inherit" }}>
+            View
+          </ToggleButton>
+          <ToggleButton value="edit" sx={{ color: "inherit" }}>
+            Edit
+          </ToggleButton>
+        </ToggleButtonGroup>
+
         {rulerActive && (
           <TextField
             label="Unit Distance (ft)"
@@ -423,73 +603,173 @@ function MapViewer({ type, src }) {
             }}
           />
         )}
+
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => addToken("/Darius.jpeg")}
+          sx={{ mt: 2 }}
+        >
+          Add Token
+        </Button>
       </Box>
 
       {/* Main interactive area with image or video and overlays */}
-      <MapInteractionCSS
-        value={{ scale, translation }}
-        onChange={({ scale, translation }) => {
-          setScale(scale);
-          setTranslation(translation);
-        }}
-        showControls={mode === "view"}
-        disableZoom={mode === "edit"}
-        disablePan={mode === "edit"}
-        sx={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+      <Stage
+        width={window.innerWidth}
+        height={window.innerHeight}
+        scaleX={scale}
+        scaleY={scale}
+        x={translation.x}
+        y={translation.y}
+        onWheel={handleWheel}
+        onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
+        onMouseUp={handleStageMouseUp}
+        ref={stageRef}
+        draggable={mode === "view"}
+        onClick={handleStageClick}
       >
-        {type === "image" && (
-          <div
-            style={{
-              position: "relative",
-              width: `${dimensions.width}px`,
-              height: `${dimensions.height}px`,
-            }}
-          >
-            <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
-            <canvas
-              ref={gridCanvasRef}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-              }}
+        <Layer>
+          {type === "image" && image && (
+            <KonvaImage
+              image={image}
+              width={dimensions.width}
+              height={dimensions.height}
             />
-            <canvas
-              ref={fogCanvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-              }}
+          )}
+          {type !== "image" && (
+            <ReactPlayer
+              url={src}
+              controls={true}
+              width="100%"
+              height="100%"
+              style={{ position: "relative" }}
             />
-          </div>
+          )}
+        </Layer>
+        {showGrid && (
+          <Layer>
+            {[...Array(Math.ceil(dimensions.width / gridSpacing)).keys()].map(
+              (i) => (
+                <Line
+                  points={[
+                    i * gridSpacing,
+                    0,
+                    i * gridSpacing,
+                    dimensions.height,
+                  ]}
+                  stroke="rgba(255, 255, 255, 0.5)"
+                  strokeWidth={1}
+                  key={`v${i}`}
+                />
+              )
+            )}
+            {[...Array(Math.ceil(dimensions.height / gridSpacing)).keys()].map(
+              (i) => (
+                <Line
+                  points={[
+                    0,
+                    i * gridSpacing,
+                    dimensions.width,
+                    i * gridSpacing,
+                  ]}
+                  stroke="rgba(255, 255, 255, 0.5)"
+                  strokeWidth={1}
+                  key={`h${i}`}
+                />
+              )
+            )}
+          </Layer>
         )}
-        {type !== "image" && (
-          <ReactPlayer
-            url={src}
-            controls={true}
-            width="100%"
-            height="100%"
-            style={{ position: "relative" }}
-          />
+        {showFogOfWar && (
+          <Layer id="fogLayer" ref={fogLayerRef}>
+            <KonvaImage
+              image={fogCanvasRef.current} // Use the fog canvas as the source image
+              width={dimensions.width}
+              height={dimensions.height}
+            />
+          </Layer>
         )}
-      </MapInteractionCSS>
+        <Layer id="tokenLayer">
+          {tokens.map((token) => (
+            <Group key={token.id}>
+              <KonvaImage
+                image={token.image}
+                x={token.position.x}
+                y={token.position.y}
+                width={token.size}
+                height={token.size}
+                draggable
+                onClick={() => handleTokenClick(token)}
+                onDragStart={handleDragStart}
+                onDragEnd={(e) => handleDragEnd(e, token)}
+                onDblClick={() =>
+                  showInputField(
+                    token.position.x,
+                    token.position.y + token.size + 5,
+                    token.name
+                  )
+                }
+              />
+
+              {!isDragging && (
+                <Text
+                  text={token.name}
+                  x={token.position.x}
+                  y={token.position.y + token.size}
+                  fontSize={14}
+                  fill="white"
+                  align="center"
+                  width={token.size}
+                />
+              )}
+              {renderTokenUI(token)}
+            </Group>
+          ))}
+        </Layer>
+        <Layer id="rulerLayer">
+          {rulerStart && rulerEnd && (
+            <>
+              <Line
+                points={[rulerStart.x, rulerStart.y, rulerEnd.x, rulerEnd.y]}
+                stroke="red"
+                strokeWidth={2}
+              />
+              <Text
+                text={`${calculateDistance(rulerStart, rulerEnd)} ft`}
+                x={(rulerStart.x + rulerEnd.x) / 2}
+                y={(rulerStart.y + rulerEnd.y) / 2}
+                fill="white"
+              />
+            </>
+          )}
+        </Layer>
+      </Stage>
+
+      {/* Hidden canvas used for fog of war */}
+      <canvas
+        ref={fogCanvasRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        style={{ display: "none" }}
+      />
+
+      {/* Input field for editing token name */}
+      {inputVisible && (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleEditTokenName}
+          onBlur={handleInputBlur}
+          style={{
+            position: "absolute",
+            top: inputPosition.y,
+            left: inputPosition.x,
+            zIndex: 25,
+          }}
+        />
+      )}
     </Box>
   );
 }
