@@ -9,6 +9,8 @@ const MapTokenContext = createContext();
 export const MapTokenProvider = ({ children }) => {
   const [maps, setMaps] = useState([]);
   const [tokens, setTokens] = useState([]);
+  const [src, setSrc] = useState("/FeyRuinsAutumn.jpg");
+  const [tokenSrc, setTokenSrc] = useState("/Darius.jpeg");
 
   useEffect(() => {
     // Set up the real-time listener for maps
@@ -39,7 +41,9 @@ export const MapTokenProvider = ({ children }) => {
   }, []);
 
   return (
-    <MapTokenContext.Provider value={{ maps, setMaps, tokens, setTokens }}>
+    <MapTokenContext.Provider
+      value={{ maps, setMaps, tokens, setTokens, src, setSrc }}
+    >
       {children}
     </MapTokenContext.Provider>
   );

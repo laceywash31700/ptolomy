@@ -7,7 +7,7 @@ import Button from "@mui/joy/Button";
 import AspectRatio from "@mui/joy/AspectRatio";
 
 export default function MapList() {
-  const { maps } = useMapTokenContext(); // Get maps from context
+  const { maps, setSrc } = useMapTokenContext(); // Get maps from context
   const [open, setOpen] = useState(false);
   const [gData, setGData] = useState([]);
   const [expandedKeys] = useState(["0-0", "0-0-0", "0-0-0-0"]);
@@ -15,13 +15,12 @@ export default function MapList() {
   // Prepare the tree data based on the maps
   const mapData = maps.map((map) => ({
     title: (
-      <AspectRatio
-        variant="soft"
-      >
+      <AspectRatio variant="soft">
         <img
           src={map.asset}
           alt={map.id}
           style={{ maxWidth: "inherit" }}
+          onClick={() => setSrc(map.asset)}
         />
       </AspectRatio>
     ),

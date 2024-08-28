@@ -6,17 +6,14 @@ import MapViewer from "./MapViewer/Index";
 import { ToastContainer } from "react-toastify";
 import { GameState } from "./SocketContext/Index";
 import LogIn from "./LogIn/Index"; // Import your login component
-import { MapTokenProvider } from "./Map&TokenContext/Index.jsx"; // Import your context
+import { MapTokenProvider, useMapTokenContext } from "./Map&TokenContext/Index.jsx"; // Import your context
 import "react-toastify/dist/ReactToastify.css";
 
-function App() {
+function MainApp() {
+  const { src } = useMapTokenContext();
   const [open, setOpen] = useState(false);
   const [mapType, setMapType] = useState("image");
-  const [mapSrc, setMapSrc] = useState("/FeyRuinsAutumn.jpg");
   const [tokenSrc, setTokenSrc] = useState("/Darius.jpeg");
-
-  // New state to track if the user is logged in
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -27,14 +24,39 @@ function App() {
     left: 0,
     width: "100vw",
     height: "100vh",
-    backgroundImage: `url(${mapSrc})`,
-    backgroundSize: "100%",
+    backgroundImage: `url(${src})`,
+    backgroundSize: "cover",
     backgroundPosition: "center",
     filter: "blur(30px)",
     zIndex: -10,
   };
 
-  // Function to handle login success
+  return (
+    <Container maxWidth="false" disableGutters>
+      <Box sx={{ position: "relative", minHeight: "100vh" }}>
+        <div style={backgroundStyle}></div>
+        <Fab
+          color="primary"
+          aria-label="add"
+          sx={{
+            position: "fixed",
+            bottom: 75,
+            right: 75,
+          }}
+          onClick={handleOpen}
+        >
+          <AddIcon />
+        </Fab>
+        <Upload open={open} handleClose={handleClose} />
+        <MapViewer type={mapType} token={tokenSrc} />
+      </Box>
+    </Container>
+  );
+}
+
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   const handleLogin = () => {
     setIsLoggedIn(true);
   };
@@ -43,25 +65,7 @@ function App() {
     <GameState>
       <MapTokenProvider>
         {isLoggedIn ? (
-          <Container maxWidth="false" disableGutters>
-            <Box sx={{ position: "relative", minHeight: "100vh" }}>
-              <div style={backgroundStyle}></div>
-              <Fab
-                color="primary"
-                aria-label="add"
-                sx={{
-                  position: "fixed",
-                  bottom: 75,
-                  right: 75,
-                }}
-                onClick={handleOpen}
-              >
-                <AddIcon />
-              </Fab>
-              <Upload open={open} handleClose={handleClose} />
-              <MapViewer type={mapType} src={mapSrc} token={tokenSrc} />
-            </Box>
-          </Container>
+          <MainApp />
         ) : (
           <>
             <LogIn login={handleLogin} />
