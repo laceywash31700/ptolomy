@@ -27,13 +27,16 @@ import BloodiedIcon from "/blood.png"; // Update with the correct path
 import DeadIcon from "/skull.png"; // Update with the correct path
 import useImage from "use-image";
 import MapList from "../MapList/Index";
+import { useMapTokenContext } from "../Map&TokenContext/Index";
 
-function MapViewer({ type, src }) {
+function MapViewer({ type }) {
+  const {src} = useMapTokenContext(); 
+  
   const stageRef = useRef(null); // Reference to the Konva Stage
   const [scale, setScale] = useState(1.1);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [translation, setTranslation] = useState({ x: 0, y: 0 });
-
+  
   const [gridSpacing, setGridSpacing] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
   const [showGridSettings, setShowGridSettings] = useState(false);
@@ -613,7 +616,7 @@ function MapViewer({ type, src }) {
         >
           Add Token
         </Button>
-        <MapList/>
+        <MapList />
       </Box>
 
       {/* Main interactive area with image or video and overlays */}
