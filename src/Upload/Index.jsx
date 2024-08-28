@@ -13,26 +13,16 @@ const style = {
   p: 4,
 };
 
-function Maps({ open, handleClose, maps }) {
+function Upload({ open, handleClose}) {
   return (
     <Modal open={open} onClose={handleClose}>
       <Box sx={style}>
-        {maps.length === 0 ? (
-          <>
-            <MapDragAndDrop/>
-            <br/>
-            <TokenDragAndDrop/>
-          </>
-        ) : (
-          <>
             <MapDragAndDrop />
             <br/>
             <TokenDragAndDrop/>
-          </>
-        )}
       </Box>
     </Modal>
   );
 }
 
-export default Maps;
+export default Upload;

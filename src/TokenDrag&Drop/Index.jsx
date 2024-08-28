@@ -1,10 +1,11 @@
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { tokenRef } from "../firebase/firebase";
+import { tokenRef } from "../Firebase/firebase";
 import { v4 as uuidv4 } from "uuid";
-import { ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { db, tokensCollection } from "../Firebase/firebase";
+import { useMapTokenContext } from "../Map&TokenContext/Index";
 
 const baseStyle = {
   border: "2px dashed #00e676", // Different color for differentiation
@@ -19,19 +20,25 @@ const activeStyle = {
 };
 
 function Tokens() {
+  const { tokens, setTokens } = useMapTokenContext();
   const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0];
+  const file = acceptedFiles[0];
 
     try {
-      const asset = `${file.name}-${uuidv4()}`;
+      const uid = uuidv4();
+      const asset = `${file.name}-${uid}`;
       const imageRef = ref(tokenRef, asset);
       await uploadBytes(imageRef, file);
+      const storageUrl = await getDownloadURL(imageRef); 
+      console.log('this is the image Url:', storageUrl);
       // ========= This is where we want to write the code to store the image ref for this token ===============
-      const docRef = await addDoc(collection(db, "tokens"), {
-        asset: asset,
+      await addDoc( tokensCollection , {
+        asset: storageUrl,
       });
-      console.log("document written with ID:", docRef.id);
+      const updatedTokensUrls = tokens.push(storageUrl);
+      setTokens(updatedTokensUrls);
       // =======================================================================================================
+
       console.log("Uploaded Token");
     } catch (error) {
       console.error("Error uploading file", error);

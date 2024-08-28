@@ -2,7 +2,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getStorage , ref, uploadBytes } from "firebase/storage";
-import { getFirestore } from "firebase/firestore";
+import { collection, getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -39,7 +39,9 @@ export const auth = getAuth();
 export const db = getFirestore(app);
 export const rootRef = ref(storage);
 export const mapRef = ref(rootRef, 'maps');
-export const tokenRef = ref(rootRef, 'tokens')
+export const tokenRef = ref(rootRef, 'tokens');
+export const mapsCollection = collection(db, "maps");
+export const tokensCollection = collection(db, "tokens");
 
 export default app;
 

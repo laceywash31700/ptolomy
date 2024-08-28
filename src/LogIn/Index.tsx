@@ -17,7 +17,7 @@ import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import GoogleIcon from "./GoogleIcon";
-import { auth, db } from "../firebase/firebase";
+import { auth, db } from "../Firebase/firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -94,11 +94,13 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
           lastName: data.lastName,
           email: user.email,
         });
+       console.log("User is registered successfully with", user.uid);
       }
-      console.log("User is registered successfully");
       toast.success("User Registered Successfully!!", {
         position: "top-center",
       });
+      await signInWithEmailAndPassword(auth, data.email, data.password);
+      props.login();
     } catch (error) {
       console.log(error.message);
       toast.error(error.message, {
