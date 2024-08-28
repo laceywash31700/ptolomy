@@ -1,10 +1,10 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getStorage , ref, uploadBytes } from "firebase/storage";
+import { getStorage , ref,  } from "firebase/storage";
 import { collection, getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getAnalytics } from "firebase/analytics";
+import { getAuth, GoogleAuthProvider} from "firebase/auth";
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -33,7 +33,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const storage = getStorage(app);
-const analytics = getAnalytics(app);
 
 export const auth = getAuth();
 export const db = getFirestore(app);
@@ -42,6 +41,7 @@ export const mapRef = ref(rootRef, 'maps');
 export const tokenRef = ref(rootRef, 'tokens');
 export const mapsCollection = collection(db, "maps");
 export const tokensCollection = collection(db, "tokens");
+
 
 export default app;
 

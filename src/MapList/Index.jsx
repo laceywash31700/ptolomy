@@ -12,10 +12,6 @@ export default function MapList() {
   const [gData, setGData] = useState([]);
   const [expandedKeys] = useState(["0-0", "0-0-0", "0-0-0-0"]);
 
-  const changeMap = (map) => {
-    setSrc(map);
-  };
-
   // Prepare the tree data based on the maps
   const mapData = maps.map((map) => ({
     title: (
@@ -24,7 +20,7 @@ export default function MapList() {
           src={map.asset}
           alt={map.id}
           style={{ maxWidth: "inherit" }}
-          onClick={() => changeMap(map.asset)}
+          onClick={() => setSrc(map.asset)}
         />
       </AspectRatio>
     ),

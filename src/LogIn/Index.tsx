@@ -16,7 +16,6 @@ import Stack from "@mui/joy/Stack";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
-import GoogleIcon from "./GoogleIcon";
 import { auth, db } from "../Firebase/firebase";
 import {
   createUserWithEmailAndPassword,
@@ -94,7 +93,7 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
           lastName: data.lastName,
           email: user.email,
         });
-       console.log("User is registered successfully with", user.uid);
+        console.log("User is registered successfully with", user.uid);
       }
       toast.success("User Registered Successfully!!", {
         position: "top-center",
@@ -132,7 +131,6 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
       });
     }
   };
-
   return (
     <CssVarsProvider theme={customTheme} disableTransitionOnChange>
       <CssBaseline />
@@ -252,23 +250,6 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
                     </Link>
                   </Typography>
                 </Stack>
-                <Button
-                  variant="soft"
-                  color="neutral"
-                  fullWidth
-                  startDecorator={<GoogleIcon />}
-                >
-                  Continue with Google
-                </Button>
-                <Divider
-                  sx={(theme) => ({
-                    [theme.getColorSchemeSelector("light")]: {
-                      color: { xs: "#FFF", md: "text.tertiary" },
-                    },
-                  })}
-                >
-                  or
-                </Divider>
                 <Stack sx={{ gap: 4, mt: 2 }}>
                   <form onSubmit={handleSignIn}>
                     <FormControl required>
