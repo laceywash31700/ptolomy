@@ -1,10 +1,11 @@
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { mapRef } from "../firebase/firebase";
-import { ref, uploadBytes } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { mapRef } from "../Firebase/firebase";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { addDoc } from "firebase/firestore";
+import { mapsCollection, } from "../Firebase/firebase";
 import { v4 as uuidv4 } from "uuid";
+import { useMapTokenContext } from "../Map&TokenContext/Index";
 
 const baseStyle = {
   border: "2px dashed #2196f3", // Highlighted border by default
@@ -19,18 +20,23 @@ const activeStyle = {
 };
 
 function DragAndDrop() {
+  const { maps, setMaps } = useMapTokenContext();
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
 
     try {
-      const asset = `${file.name}-${uuidv4()}`
+      const uid = uuidv4();
+      const asset = `${file.name}-${uid}`
       const imageRef = ref(mapRef, asset);
       await uploadBytes(imageRef, file);
+      const storageUrl = await getDownloadURL(imageRef);
+      console.log('this is the image Url:', storageUrl);
       // ========= This is where we want to write the code to store the image ref for this map ===============
-      const docRef = await addDoc(collection(db, "maps"), {
-        asset: asset,
+      await addDoc( mapsCollection , {
+        asset: storageUrl,
       });
-      console.log("document written with ID:", docRef.id);
+      const updatedMapsUrls = maps.push(storageUrl);
+      setMaps(updatedMapsUrls);
       // =======================================================================================================
       console.log("Uploaded map");
     } catch (error) {

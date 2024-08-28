@@ -26,6 +26,7 @@ import DeleteIcon from "/bin.png"; // Update with the correct path
 import BloodiedIcon from "/blood.png"; // Update with the correct path
 import DeadIcon from "/skull.png"; // Update with the correct path
 import useImage from "use-image";
+import MapList from "../MapList/Index";
 
 function MapViewer({ type, src }) {
   const stageRef = useRef(null); // Reference to the Konva Stage
@@ -612,6 +613,7 @@ function MapViewer({ type, src }) {
         >
           Add Token
         </Button>
+        <MapList/>
       </Box>
 
       {/* Main interactive area with image or video and overlays */}
