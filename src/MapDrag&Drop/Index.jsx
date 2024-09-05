@@ -35,14 +35,12 @@ function DragAndDrop() {
       await addDoc( mapsCollection , {
         asset: storageUrl,
       });
-      const updatedMapsUrls = maps.push(storageUrl);
-      setMaps(updatedMapsUrls);
       // =======================================================================================================
       console.log("Uploaded map");
     } catch (error) {
       console.error("Error uploading file", error);
     }
-  }, []);
+  }, [maps]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

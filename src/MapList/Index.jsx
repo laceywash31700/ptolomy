@@ -11,7 +11,7 @@ export default function MapList() {
   const [open, setOpen] = useState(false);
   const [gData, setGData] = useState([]);
   const [expandedKeys] = useState(["0-0", "0-0-0", "0-0-0-0"]);
-
+  console.log("this is the in the mapsList:", maps);
   // Prepare the tree data based on the maps
   const mapData = maps.map((map) => ({
     title: (
