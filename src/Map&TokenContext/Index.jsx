@@ -19,8 +19,8 @@ export const MapTokenProvider = ({ children }) => {
         id: doc.id,
         ...doc.data(),
       }));
-      setMaps(mapsData);
       console.log("Updated maps data:", mapsData);
+      setMaps(mapsData);
     });
 
     // Set up the real-time listener for tokens

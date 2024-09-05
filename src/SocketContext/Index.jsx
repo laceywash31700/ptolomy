@@ -1,5 +1,5 @@
-import { Message } from '@mui/icons-material';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { io } from "socket.io-client";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 const SocketContext = createContext();
 
@@ -9,25 +9,36 @@ export const useSocket = () => {
 
 export const GameState = ({ children }) => {
   const [socket, setSocket] = useState(null);
+  const [userName, setUserName] = useState(null);
+  const [role, setRole] = useState(null);
 
   useEffect(() => {
-    console.log('code is running');
-    const newSocket = new WebSocket('ws://localhost:8080');
-    newSocket.onmessage = (message) => {
-      console.log('WebSocket message received:', message);
-      // handle the message if needed
-    };
-  
-    newSocket.onopen = function () {
-      console.log('you are connected');
-    };
-    setSocket(newSocket);
+    if (role && userName) {
+      console.log("Establishing WebSocket connection");
+      const newSocket = io(`ws://localhost:8080`, {
+        query: { username: userName, role: role },
+      });
 
-    return () => newSocket.close();
-  }, []);
+      newSocket.on("connect", () => {
+        console.log("Connected to WebSocket server");
+
+        // Example of emitting a message
+        newSocket.emit("message", "Hello from client");
+
+        // Example of handling a message from the server
+        newSocket.on("message", (message) => {
+          console.log("WebSocket message received:", message);
+        });
+      });
+
+      setSocket(newSocket);
+
+      return () => newSocket.close();
+    }
+  }, [role, userName]);
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket, setRole, setUserName }}>
       {children}
     </SocketContext.Provider>
   );

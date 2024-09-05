@@ -35,10 +35,7 @@ function Tokens() {
       await addDoc( tokensCollection , {
         asset: storageUrl,
       });
-      const updatedTokensUrls = tokens.push(storageUrl);
-      setTokens(updatedTokensUrls);
       // =======================================================================================================
-
       console.log("Uploaded Token");
     } catch (error) {
       console.error("Error uploading file", error);

@@ -5,7 +5,8 @@ import CssBaseline from "@mui/joy/CssBaseline";
 import Box from "@mui/joy/Box";
 import Button from "@mui/joy/Button";
 import Checkbox from "@mui/joy/Checkbox";
-import Divider from "@mui/joy/Divider";
+import Select from "@mui/joy/Select";
+import Option from "@mui/joy/Option";
 import FormControl from "@mui/joy/FormControl";
 import FormLabel from "@mui/joy/FormLabel";
 import IconButton, { IconButtonProps } from "@mui/joy/IconButton";
@@ -37,6 +38,8 @@ interface SignInFormElement extends HTMLFormElement {
 interface SignUpFormElements extends HTMLFormControlsCollection {
   firstName: HTMLInputElement;
   lastName: HTMLInputElement;
+  userName: HTMLInputElement;
+  role: HTMLSelectElement;
   email: HTMLInputElement;
   password: HTMLInputElement;
 }
@@ -70,6 +73,7 @@ function ColorSchemeToggle(props: IconButtonProps) {
 
 export default function JoySignInSideTemplate(props: { login: () => void }) {
   const [isSignUp, setIsSignUp] = React.useState(false);
+  const [role, setRole] = React.useState<string | null>('');
 
   const handleFormToggle = () => {
     setIsSignUp(!isSignUp);
@@ -81,9 +85,12 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
     const data = {
       firstName: formElements.firstName.value,
       lastName: formElements.lastName.value,
+      userName: formElements.userName.value,
       email: formElements.email.value,
       password: formElements.password.value,
+      role: role,
     };
+    console.log("Data submitted:", data);  // Add this line to debug
     try {
       await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = auth.currentUser;
@@ -91,9 +98,11 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
         await setDoc(doc(db, "users", user.uid), {
           firstName: data.firstName,
           lastName: data.lastName,
+          userName: data.userName,
+          role: data.role,
           email: user.email,
         });
-        console.log("User is registered successfully with", user.uid);
+        console.log("User is registered successfully with", data.role);
       }
       toast.success("User Registered Successfully!!", {
         position: "top-center",
@@ -149,7 +158,6 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
           overflow: "hidden",
         }}
       >
-        {/* Form Container */}
         <Box
           sx={{
             flex: 1,
@@ -222,12 +230,26 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
                       <Input type="text" name="lastName" />
                     </FormControl>
                     <FormControl required>
+                      <FormLabel>Username</FormLabel>
+                      <Input type="text" name="userName" />
+                    </FormControl>
+                    <FormControl required>
                       <FormLabel>Email</FormLabel>
                       <Input type="email" name="email" />
                     </FormControl>
                     <FormControl required>
                       <FormLabel>Password</FormLabel>
                       <Input type="password" name="password" />
+                    </FormControl>
+                    <FormControl required>
+                      <FormLabel>Role</FormLabel>
+                      <Select name="role" defaultValue="" onChange={(e, value) => setRole(value) }>
+                        <Option value="" disabled hidden>
+                          Select a role
+                        </Option>
+                        <Option value="GM">Game Master (GM)</Option>
+                        <Option value="PC">Player Character (PC)</Option>
+                      </Select>
                     </FormControl>
                     <Stack sx={{ gap: 4, mt: 2 }}>
                       <Button type="submit" fullWidth>
