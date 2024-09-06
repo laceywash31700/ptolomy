@@ -41,7 +41,8 @@ export const mapRef = ref(rootRef, 'maps');
 export const tokenRef = ref(rootRef, 'tokens');
 export const mapsCollection = collection(db, "maps");
 export const tokensCollection = collection(db, "tokens");
-
+export const usersCollection = collection(db, "users")
+export const sessionsCollection = collection(db, "sessions")
 
 export default app;
 
