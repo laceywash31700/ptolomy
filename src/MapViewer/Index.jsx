@@ -27,16 +27,19 @@ import BloodiedIcon from "/blood.png"; // Update with the correct path
 import DeadIcon from "/skull.png"; // Update with the correct path
 import useImage from "use-image";
 import MapList from "../MapList/Index";
+import { v4 as uuidv4 } from "uuid";
 import { useMapTokenContext } from "../Map&TokenContext/Index";
+import { useSocket } from "../SocketContext/Index";
 
 function MapViewer({ type }) {
-  const {src} = useMapTokenContext(); 
-  
+  const { src } = useMapTokenContext();
+  const { socket } = useSocket();
+
   const stageRef = useRef(null); // Reference to the Konva Stage
   const [scale, setScale] = useState(1.1);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [translation, setTranslation] = useState({ x: 0, y: 0 });
-  
+
   const [gridSpacing, setGridSpacing] = useState(50);
   const [showGrid, setShowGrid] = useState(false);
   const [showGridSettings, setShowGridSettings] = useState(false);
@@ -221,19 +224,21 @@ function MapViewer({ type }) {
 
   // Add a new token to the map
   const addToken = (url) => {
-    const img = new window.Image();
-    img.src = url;
-    img.onload = () => {
-      const newToken = {
-        id: Date.now(),
-        image: img,
-        name: "Token",
-        effects: [], // Initialize as an empty array
-        position: { x: 0, y: 0 },
-        size: gridSpacing,
-      };
-      setTokens((prevTokens) => [...prevTokens, newToken]);
+    const newToken = {
+      id: uuidv4(),
+      imageUrl: url,
+      name: "Token",
+      effects: [], // Initialize as an empty array
+      position: { x: 0, y: 0 },
+      size: gridSpacing,
     };
+    setTokens((prevTokens) => {
+      const updatedTokens = [...prevTokens, newToken];
+      // Emit the new token to the server after it's created
+      socket.emit("new-token", { ...newToken, image: undefined }); // <-- Emit the token object
+      console.log("New token emitted:", socket);
+      return updatedTokens;
+    });
   };
 
   const handleTokenClick = (token) => {
@@ -255,6 +260,21 @@ function MapViewer({ type }) {
     setIsDragging(true);
   };
 
+  const handleDragMove = (e, token) => {
+    const updatedTokens = tokens.map((t) =>
+      t.id === token.id
+        ? { ...t, position: { x: e.target.x(), y: e.target.y() } }
+        : t
+    );
+    // console.log("this is the tokens position",token.position);
+    setTokens(updatedTokens);
+
+    socket.emit("update-token-position", {
+      id: token.id,
+      position: { x: e.target.x(), y: e.target.y() },
+    });
+  };
+
   const handleDragEnd = (e, token) => {
     setIsDragging(false);
     const updatedTokens = tokens.map((t) =>
@@ -263,6 +283,11 @@ function MapViewer({ type }) {
         : t
     );
     setTokens(updatedTokens);
+
+    socket.emit("update-token-position", {
+      id: token.id,
+      position: { x: e.target.x(), y: e.target.y() },
+    });
   };
 
   const removeToken = (id) => {
@@ -303,8 +328,59 @@ function MapViewer({ type }) {
     setInputVisible(true);
   };
 
+  // useEffect for taking in new tokenData from server when another client adds a new token.
   useEffect(() => {
-    // console.log(tokens[0].position);
+    if (socket) {
+      socket.on("new-token-broadcast", (tokenData) => {
+        setTokens((prevTokens) => [...prevTokens, tokenData]);
+      });
+
+      // Clean up the listener when the component unmounts
+      return () => {
+        socket.off("new-token-broadcast");
+      };
+    }
+  }, [socket]);
+
+  // useEffect to dynamically change url prop in token obj to an image object when the the tokens state changes.
+  useEffect(() => {
+    tokens.forEach((token) => {
+      // If the token doesn't have the image object, load it
+      if (!token.image && token.imageUrl) {
+        const img = new window.Image();
+        img.src = token.imageUrl;
+        img.onload = () => {
+          // Update the token with the loaded image
+          setTokens((prevTokens) =>
+            prevTokens.map((t) =>
+              t.id === token.id ? { ...t, image: img } : t
+            )
+          );
+        };
+      }
+    });
+  }, [tokens]);
+
+  // // useEffect to update the position of a token from another client.
+  useEffect(() => {
+    if (socket) {
+      socket.on("updated-token-position-broadcast", (tokenData) => {
+        const updatedTokens = tokens.map((t) =>
+          t.id === tokenData.id ? { ...t, position: tokenData.position } : t
+        );
+        setTokens(updatedTokens);
+      });
+
+      // This will clean up the listener when the component unmounts so there is no memory leaks or unexpected
+      // behavior.
+      return () => {
+        socket.off("update-token-position-broadcast");
+      };
+    }
+  }, [tokens, socket]);
+
+  // WIP for changing the tokens Size and and rotations will eventually add socket functionality when trans is working.
+  useEffect(() => {
     if (selectedToken && transformerRef.current) {
       transformerRef.current.nodes([
         stageRef.current.findOne(`#${selectedToken.id}`),
@@ -708,6 +784,7 @@ function MapViewer({ type }) {
                 draggable
                 onClick={() => handleTokenClick(token)}
                 onDragStart={handleDragStart}
+                onDragMove={(e) => handleDragMove(e, token)}
                 onDragEnd={(e) => handleDragEnd(e, token)}
                 onDblClick={() =>
                   showInputField(

@@ -129,7 +129,7 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
       persistent: formElements.persistent.checked,
     };
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+     await signInWithEmailAndPassword(auth, data.email, data.password);
       console.log("User logged in Successfully");
       toast.success("User logged in Successfully", {
         position: "top-center",

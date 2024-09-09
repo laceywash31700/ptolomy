@@ -2,23 +2,20 @@ import { io } from "socket.io-client";
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../Firebase/firebase"; 
-import { getDocs, query, where, collection } from "firebase/firestore";
-import { db } from "../Firebase/firebase"; // Import Firestore DB
+import { getDocs, query, where} from "firebase/firestore";
+import { usersCollection } from "../Firebase/firebase"; // Import Firestore DB
 
 const SocketContext = createContext();
 
-export const GameState = ({ children }) => {
+export const GameState = ({ children, isLoggedIn }) => {
   const [socket, setSocket] = useState(null);
-  const [userName, setUserName] = useState(null);
-  const [role, setRole] = useState(null);
-  const [email, setEmail] = useState(null);
   const [userData, setUserData] = useState(null);
 
   // Handle Firebase authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const usersCollection = collection(db, "users");
+      
         const q = query(usersCollection, where("email", "==", user.email));
 
         try {
@@ -29,12 +26,9 @@ export const GameState = ({ children }) => {
             const userDoc = querySnapshot.docs[0];
             const data = userDoc.data();
 
-            console.log("User data from Firestore:", data);
+          
 
             setUserData(data);  // Set the user data
-            setUserName(data.userName); // Set the userName from Firestore
-            setRole(data.role); // Set the role from Firestore
-            setEmail(data.email); // Set the email from Firestore
           } else {
             console.log("No user data found in Firestore for email:", user.email);
           }
@@ -44,9 +38,6 @@ export const GameState = ({ children }) => {
       } else {
         // No user is signed in
         setUserData(null);
-        setUserName(null);
-        setRole(null);
-        setEmail(null);
         console.log("No user is signed in");
       }
     });
@@ -56,31 +47,40 @@ export const GameState = ({ children }) => {
 
   // Establish WebSocket connection when userName, role, and email are set
   useEffect(() => {
-    if (role && userName && email) {
+    if (userData?.role && userData?.userName && userData?.email && isLoggedIn) {
       console.log("Establishing WebSocket connection");
-
-      const newSocket = io(`http://localhost:8080`, {
+  
+      const { userName, role, email } = userData;
+  
+      const newSocket = io(`${import.meta.env.VITE_SOCKET_SERVER}`, {
         query: { username: userName, role: role, email: email },
       });
-
-      newSocket.on("connect", () => {
-        console.log("Connected to WebSocket server");
-
-        // Example of emitting a message
-        newSocket.emit("message", "Hello from client");
-
-        // Example of handling a message from the server
-        newSocket.on("message", (message) => {
-          console.log("WebSocket message received:", message);
+  
+      // Add null checks to avoid errors
+      if (newSocket) {
+        newSocket.on("connect", () => {
+          console.log("Connected to WebSocket server");
+  
+          // Emit and listen for messages
+          newSocket.emit("message", "Hello from client");
+          newSocket.on("message", (message) => {
+            console.log("WebSocket message received:", message);
+          });
         });
-      });
-
-      setSocket(newSocket);
-
-      return () => newSocket.close(); // Clean up the socket connection on component unmount or change in dependencies
+  
+        setSocket(newSocket);
+      } else {
+        console.error("Failed to establish WebSocket connection");
+      }
+  
+      return () => {
+        if (newSocket) {
+          console.log("Closing WebSocket connection");
+          newSocket.close();
+        }
+      };
     }
-  }, [role, userName, email]);
-
+  }, [isLoggedIn, userData]);
   return (
     <SocketContext.Provider value={{ socket, userData }}>
       {children}

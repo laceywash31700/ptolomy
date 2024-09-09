@@ -9,6 +9,7 @@ import LogIn from "./LogIn/Index"; // Import your login component
 import { MapTokenProvider, useMapTokenContext } from "./Map&TokenContext/Index.jsx"; // Import your context
 import "react-toastify/dist/ReactToastify.css";
 
+
 function MainApp() {
   const { src } = useMapTokenContext();
   const [open, setOpen] = useState(false);
@@ -62,7 +63,7 @@ function App() {
   };
 
   return (
-    <GameState>
+    <GameState isLoggedIn={isLoggedIn} >
       <MapTokenProvider>
         {isLoggedIn ? (
           <MainApp />
