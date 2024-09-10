@@ -364,7 +364,7 @@ function MapViewer({ type }) {
   // // useEffect to update the position of a token from another client.
   useEffect(() => {
     if (socket) {
-      socket.on("updated-token-position-broadcast", (tokenData) => {
+      socket.on("update-token-position-broadcast", (tokenData) => {
         const updatedTokens = tokens.map((t) =>
           t.id === tokenData.id ? { ...t, position: tokenData.position } : t
         );
@@ -377,7 +377,7 @@ function MapViewer({ type }) {
         socket.off("update-token-position-broadcast");
       };
     }
-  }, [tokens, socket]);
+  }, [socket, tokens]);
 
   // WIP for changing the tokens Size and and rotations will eventually add socket functionality when trans is working.
   useEffect(() => {
