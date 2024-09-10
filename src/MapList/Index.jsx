@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Tree } from "antd";
 import { useMapTokenContext } from "../Map&TokenContext/Index";
 import Box from "@mui/joy/Box";
@@ -22,20 +22,23 @@ export default function MapList() {
   }
 
   // Prepare the tree data based on the maps
-  const mapData = maps.map((map) => ({
-    title: (
-      <AspectRatio variant="soft">
-        <img
-          src={map.asset}
-          alt={map.id}
-          style={{ maxWidth: "inherit" }}
-          onClick={() => handleSrcChange(map.asset)}
-        />
-      </AspectRatio>
-    ),
-    key: map.id,
-  }));
+  const mapData = useMemo(() => 
+    maps.map((map) => ({
+      title: (
+        <AspectRatio variant="soft">
+          <img
+            src={map.asset}
+            alt={map.id}
+            style={{ maxWidth: "inherit" }}
+            onClick={() => handleSrcChange(map.asset)}
+          />
+        </AspectRatio>
+      ),
+      key: map.id,
+    }))
+  , [maps, handleSrcChange]);
 
+  
   const toggleDrawer = (inOpen) => (event) => {
     if (
       event.type === "keydown" &&
