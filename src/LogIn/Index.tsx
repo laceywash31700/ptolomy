@@ -20,11 +20,13 @@ import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import { auth, db } from "../Firebase/firebase";
 import {
   createUserWithEmailAndPassword,
+  sendSignInLinkToEmail,
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import { customTheme } from "../main";
+import { useSocket } from "../SocketContext/Index";
 
 interface FormElements extends HTMLFormControlsCollection {
   email: HTMLInputElement;
@@ -51,20 +53,20 @@ function ColorSchemeToggle(props: IconButtonProps) {
   const { onClick, ...other } = props;
   const { mode, setMode } = useColorScheme();
   const [mounted, setMounted] = React.useState(false);
-
+  
   React.useEffect(() => setMounted(true), []);
-
+  
   return (
     <IconButton
-      aria-label="toggle light/dark mode"
-      size="sm"
-      variant="outlined"
-      disabled={!mounted}
-      onClick={(event) => {
-        setMode(mode === "light" ? "dark" : "light");
-        onClick?.(event);
-      }}
-      {...other}
+    aria-label="toggle light/dark mode"
+    size="sm"
+    variant="outlined"
+    disabled={!mounted}
+    onClick={(event) => {
+      setMode(mode === "light" ? "dark" : "light");
+      onClick?.(event);
+    }}
+    {...other}
     >
       {mode === "light" ? <DarkModeRoundedIcon /> : <LightModeRoundedIcon />}
     </IconButton>
@@ -74,6 +76,7 @@ function ColorSchemeToggle(props: IconButtonProps) {
 export default function JoySignInSideTemplate(props: { login: () => void }) {
   const [isSignUp, setIsSignUp] = React.useState(false);
   const [role, setRole] = React.useState<string | null>('');
+  const {setEmail} = useSocket();
 
   const handleFormToggle = () => {
     setIsSignUp(!isSignUp);
@@ -126,7 +129,7 @@ export default function JoySignInSideTemplate(props: { login: () => void }) {
       persistent: formElements.persistent.checked,
     };
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+     await signInWithEmailAndPassword(auth, data.email, data.password);
       console.log("User logged in Successfully");
       toast.success("User logged in Successfully", {
         position: "top-center",

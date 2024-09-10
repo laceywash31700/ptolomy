@@ -19,7 +19,7 @@ export const MapTokenProvider = ({ children }) => {
         id: doc.id,
         ...doc.data(),
       }));
-      console.log("Updated maps data:", mapsData);
+      // console.log("Updated maps data:", mapsData);
       setMaps(mapsData);
     });
 
@@ -30,7 +30,7 @@ export const MapTokenProvider = ({ children }) => {
         ...doc.data(),
       }));
       setTokens(tokensData);
-      console.log("Updated tokens data:", tokensData);
+      // console.log("Updated tokens data:", tokensData);
     });
 
     // Clean up the listeners on unmount
