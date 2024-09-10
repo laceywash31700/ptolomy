@@ -1,17 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tree } from "antd";
 import { useMapTokenContext } from "../Map&TokenContext/Index";
 import Box from "@mui/joy/Box";
 import Drawer from "@mui/joy/Drawer";
 import Button from "@mui/joy/Button";
 import AspectRatio from "@mui/joy/AspectRatio";
+import { useSocket } from "../SocketContext/Index";
 
 export default function MapList() {
   const { maps, setSrc } = useMapTokenContext(); // Get maps from context
+  const {socket} = useSocket();
   const [open, setOpen] = useState(false);
   const [gData, setGData] = useState([]);
   const [expandedKeys] = useState(["0-0", "0-0-0", "0-0-0-0"]);
   // console.log("this is the in the mapsList:", maps);
+
+  const handleSrcChange = (src) => {
+    setSrc(src);
+    socket.emit("changing-src", {src});
+    return src;
+  }
 
   // Prepare the tree data based on the maps
   const mapData = maps.map((map) => ({
@@ -21,7 +29,7 @@ export default function MapList() {
           src={map.asset}
           alt={map.id}
           style={{ maxWidth: "inherit" }}
-          onClick={() => setSrc(map.asset)}
+          onClick={() => handleSrcChange(map.asset)}
         />
       </AspectRatio>
     ),
@@ -62,25 +70,24 @@ export default function MapList() {
         }
       }
     };
-
-    const data = [...mapData];
+    
 
     // Find dragObject
     let dragObj;
-    loop(data, dragKey, (item, index, arr) => {
+    loop(mapData, dragKey, (item, index, arr) => {
       arr.splice(index, 1);
       dragObj = item;
     });
     if (!info.dropToGap) {
       // Drop on the content
-      loop(data, dropKey, (item) => {
+      loop(mapData, dropKey, (item) => {
         item.children = item.children || [];
         item.children.unshift(dragObj);
       });
     } else {
       let ar = [];
       let i;
-      loop(data, dropKey, (_item, index, arr) => {
+      loop(mapData, dropKey, (_item, index, arr) => {
         ar = arr;
         i = index;
       });
@@ -92,8 +99,23 @@ export default function MapList() {
         ar.splice(i + 1, 0, dragObj);
       }
     }
-    setGData(data);
+    setGData(mapData);
   };
+
+  useEffect(() => {
+    if (socket) {
+      socket.on("src-changes", (data) => {
+        console.log("Received updated src from server:", data);
+        // Handle the received src change
+        setSrc(data.src); // Update state with the new src
+      });
+  
+      return () => {
+        socket.off("src-changes");
+      };
+    }
+  }, [socket]);
+  
 
   return (
     <Box sx={{ display: "flex" }}>
