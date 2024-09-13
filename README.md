@@ -11,3 +11,5 @@ Firebase features used:
 1) [firestore](https://firebase.google.com/docs/firestore/quickstart) 
 2) [firebase Auth](https://firebase.google.com/docs/auth/where-to-start)
 3) [Cloud Storage](https://firebase.google.com/docs/storage/web/start)
+
+If you not interested in testing my app yourself take a look at this [video](https://youtu.be/QCyPBRAV1sM) that showcases it's features.
